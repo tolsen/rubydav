@@ -1,0 +1,139 @@
+module WebDavTestUtils
+  
+  # delete and mkcol new coll
+  def new_coll(coll, creds={})
+    delete_coll(coll, creds)
+    response = @request.mkcol(coll, creds)
+    assert_equal '201', response.status
+  end
+    
+  # delete and put new file
+  def new_file(file, body=@stream, creds={})
+    delete_file(file, creds)
+
+    response = @request.put(file, body, creds)
+    assert_equal '201', response.status
+  end
+
+  # delete collection
+  def delete_coll(coll, creds={})
+    response = @request.delete(coll, creds)
+    assert_does_not_exist(coll, creds)
+  end
+
+  def assert_does_not_exist(coll, creds={})
+    response = @request.propfind(coll, 0, :resourcetype, creds)
+    assert_equal '404', response.status
+  end
+
+  def assert_exists(url, creds={})
+    response = @request.propfind(url, 0, :resourcetype, creds)
+    assert !response.error?
+  end
+
+  # move collection
+  def move_coll(src, dst, overwrite=true, creds={})
+    @request.move(src, dst, overwrite, creds)
+  end
+
+  # delete file
+  def delete_file(file, creds={})
+    response = @request.delete(file, creds)
+    response = @request.get(file, creds)
+    assert_equal '404', response.status
+  end
+    
+  def get_home_path username
+    return '/home/' + username
+  end
+
+  # NOTE: Currently, very specific to limestone. 
+  # Correct way to do this is principal-property-search REPORT.
+  def get_principal_uri name, *host
+    if host.empty?
+      # relative URI
+      principal_uri = '/users/' + name
+    else
+      #absolute URI
+      principal_uri = host[0] + '/users/' + name
+    end
+    return principal_uri
+  end
+  
+  # required to convert relative paths into absolute URIs
+  def baseuri
+    hosturi = URI.parse(@host)
+    hosturi.scheme + "://" + hosturi.host + ":" + hosturi.port.to_s
+  end
+
+  def assert_content_equals(expcontent, file, creds={})
+    response = @request.get(file, creds)
+    assert_equal '200', response.status
+    assert_equal expcontent, response.body
+  end
+
+  # add an ace and update the acl of the resource, returns the new acl
+  def add_ace_and_set_acl(resource, ace, creds={})
+    acl = get_acl resource, creds
+
+    # prepend the new Ace
+    acl.unshift ace
+
+    # set the access control properties of the resource
+    response = @request.acl(resource, acl, creds)
+    assert_equal '200', response.status
+
+    return acl
+  end
+
+  def get_acl(resource, creds={})
+    response = @request.propfind_acl(resource, 0, creds)
+    assert_equal '207', response.status
+    response.acl
+  end
+
+  # lock resource and return lockinfo
+  def lock_resource(path, lockinfo=RubyDav::LockInfo.new, creds={})
+    response = @request.lock(path, lockinfo, creds)
+    assert_equal '200', response.status
+    response.lockinfo
+  end
+  
+  def assert_dav_error(response_or_dav_error, condition)
+    dav_error = if response_or_dav_error.kind_of?(RubyDav::Response)
+                  assert_not_nil response_or_dav_error.dav_error
+                  response_or_dav_error.dav_error
+                else
+                  response_or_dav_error
+                end
+    assert_equal dav_error.condition.name, condition
+  end
+
+  def resize_file(path, size)
+    if !(File.exists? path) || ((File.size path) != size)
+        `dd if=/dev/zero of=#{path} bs=#{size} count=1 status=noxfer 2> /dev/null`
+    end
+  end
+  
+  def put_file_w_size path, size, creds={}
+    resize_file @bigfilepath, size
+    @bigfile = File.read @bigfilepath
+    @bigstream = StringIO.new @bigfile
+    response = @request.put(path, @bigstream, creds)
+    assert (response.status =~ /20[1|4]/)
+  end
+
+  def checkout_put_checkin url, body=@stream, creds={}
+
+    response = @request.checkout url, 0, creds
+    assert_equal '200', response.status
+
+    response = @request.put(url, body, creds)
+    assert_equal '204', response.status
+
+    response = @request.checkin url, 0, 0, creds
+    assert_equal '201', response.status
+
+  end
+
+end
