@@ -95,24 +95,81 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'cartman'
   end
 
-  def test_extended_mkcol_for_creating_group
-    @request.delete '/groups/new_group', admincreds
+  def create_group group_name
+    group_url = "/groups/#{group_name}"
+
+    @request.delete group_url, admincreds
     ace = RubyDav::Ace.new(:grant, :authenticated, false, :bind)
     acl = add_ace_and_set_acl '/groups', ace, admincreds
-
 
     ob = Object.new
     def ob.target!
       "<D:principal/>"
     end
-    response = @request.mkcol_ext '/groups/new_group', {:resourcetype => ob}
+    response = @request.mkcol_ext group_url, {:resourcetype => ob}
     assert_equal '201', response.status
     assert_equal '200', response.statuses(:resourcetype)
+    group_url
+  end
 
-    response = @request.propfind('/groups/new_group', 0, :resourcetype)
+  def test_extended_mkcol_for_creating_group
+    group_url = create_group 'testgroup'
+
+    response = @request.propfind(group_url, 0, :resourcetype)
     assert_match 'D:principal', response[:resourcetype]
 
-    @request.delete '/groups/new_group', admincreds
+    @request.delete group_url, admincreds
+  end
+
+  def test_adding_user_to_group
+    group_url = create_group 'testgroup'
+
+    prin_uri = get_principal_uri(@creds[:username], baseuri)
+
+    hrefxml = ::Builder::XmlMarkup.new()
+    hrefxml.D(:href, prin_uri)
+
+    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert !response.error?
+    assert response[:"group-member-set"]
+
+    response = @request.propfind(group_url, 0, :"group-member-set")
+    assert_equal '207', response.status
+
+    assert_xml_matches response[:"group-member-set"] do |xml|
+      xml.xmlns! 'DAV:'
+      xml.href prin_uri
+    end
+
+    @request.delete group_url, admincreds
+  end
+
+  def test_adding_group_to_itself_fails
+    group_url = create_group 'testgroup'
+
+    group_uri = baseuri + group_url
+
+    hrefxml = ::Builder::XmlMarkup.new()
+
+    hrefxml.D(:href, group_uri)
+    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert response.error?
+    assert_equal '409', response.statuses(:"group-member-set")
+
+    prin_uri = get_principal_uri(@creds[:username], baseuri)
+    hrefxml.D(:href, prin_uri)
+    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert response.error?
+    assert_equal '409', response.statuses(:"group-member-set")
+
+    response = @request.propfind(group_url, 0, :"group-member-set")
+    assert_equal '207', response.status
+    assert_equal "", response[:"group-member-set"]
+
+    @request.delete group_url, admincreds
   end
 
   def test_bad_put_user_followed_by_smaller_good_put_user
