@@ -142,7 +142,8 @@ class LimestonePrincipalTest < Test::Unit::TestCase
       xml.href prin_uri
     end
 
-    @request.delete group_url, admincreds
+    response = @request.delete group_url, admincreds
+    assert_equal '204', response.status
   end
 
   def test_adding_group_to_itself_fails
@@ -169,7 +170,69 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_equal "", response[:"group-member-set"]
 
-    @request.delete group_url, admincreds
+    response = @request.delete group_url, admincreds
+    assert_equal '204', response.status
+  end
+
+  def test_simple_transitive_membership_w_acls
+    group1_url = create_group 'testgroup1'
+    group2_url = create_group 'testgroup2'
+
+    group1_uri = baseuri + group1_url
+    group2_uri = baseuri + group2_url
+
+    hrefxml = ::Builder::XmlMarkup.new()
+
+    # add test1 user to testgroup2
+    prin_uri = get_principal_uri(@creds[:username], baseuri)
+    hrefxml.D(:href, prin_uri)
+
+    response = @request.proppatch(group2_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert !response.error?
+    assert_equal '200', response.statuses(:"group-member-set")
+
+    @request.delete '/home/test2/testcol', testcreds
+
+    # grant testgroup1 privileges to bind to /home/test2
+    ace = RubyDav::Ace.new(:grant, group1_uri, false, :bind)
+    acl = add_ace_and_set_acl '/home/test2/', ace, testcreds
+
+    # make test1 user create a collection in /home/test2
+    response = @request.mkcol '/home/test2/testcol'
+    assert_equal '403', response.status
+
+    # add testgroup2 to testgroup1. test1 user should indirectly become a member of testgroup1
+    hrefxml = ::Builder::XmlMarkup.new()
+    hrefxml.D(:href, group2_uri)
+    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert !response.error?
+    assert_equal '200', response.statuses(:"group-member-set")
+
+    # make test1 user retry creating a collection in /home/test2
+    response = @request.mkcol '/home/test2/testcol'
+    # should succeed this time
+    assert_equal '201', response.status
+
+    # test1 doesn't have unbind. so deleting should fail
+    response = @request.delete '/home/test2/testcol'
+    assert_equal '403', response.status
+
+    # grant testgroup1 unbind privileges on /home/test2
+    ace = RubyDav::Ace.new(:grant, group1_uri, false, :unbind)
+    acl = add_ace_and_set_acl '/home/test2/', ace, testcreds
+
+    # make test1 user retry deleting
+    response = @request.delete '/home/test2/testcol'
+    # should succeed this time
+    assert_equal '204', response.status
+
+    # cleanup
+    response = @request.delete group1_url, admincreds
+    assert_equal '204', response.status
+    response = @request.delete group2_url, admincreds
+    assert_equal '204', response.status
   end
 
   def test_bad_put_user_followed_by_smaller_good_put_user
