@@ -228,6 +228,48 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     # should succeed this time
     assert_equal '204', response.status
 
+    # remove testgroup2 from testgroup1. test1 user is no longer an indirect member of testgroup1
+    response = @request.proppatch(group1_url, {:"group-member-set" => "" });
+    assert_equal '207',response.status
+    assert !response.error?
+    assert_equal '200', response.statuses(:"group-member-set")
+
+    # make test1 user create a collection in /home/test2
+    response = @request.mkcol '/home/test2/testcol'
+    # should fail
+    assert_equal '403', response.status
+
+    # cleanup
+    response = @request.delete group1_url, admincreds
+    assert_equal '204', response.status
+    response = @request.delete group2_url, admincreds
+    assert_equal '204', response.status
+  end
+
+  def test_transitively_adding_group_to_itself_fails
+    group1_url = create_group 'testgroup1'
+    group2_url = create_group 'testgroup2'
+
+    group1_uri = baseuri + group1_url
+    group2_uri = baseuri + group2_url
+
+    # add testgroup2 to testgroup1
+    hrefxml = ::Builder::XmlMarkup.new()
+
+    hrefxml.D(:href, group2_uri)
+    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    assert_equal '200', response.statuses(:"group-member-set")
+
+    # now try to add testgroup1 to testgroup2
+    hrefxml = ::Builder::XmlMarkup.new()
+    hrefxml.D(:href, group1_uri)
+    response = @request.proppatch(group2_url, {:"group-member-set" => hrefxml });
+    assert_equal '207',response.status
+    # assert failure
+    assert response.error?
+    assert_equal '409', response.statuses(:"group-member-set")
+
     # cleanup
     response = @request.delete group1_url, admincreds
     assert_equal '204', response.status
