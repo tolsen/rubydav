@@ -12,12 +12,14 @@ module RubyDav
 
   class Request
 
-    # options: :new_password, :displayname, :email
+    # options: :new_password, :displayname, :email, :cur_password
     def put_user url, options
       xml = Builder::XmlMarkup.new
       xml.instruct!
       xml.L(:user, "xmlns:L" => "http://limebits.com/ns/1.0/", "xmlns:D" => "DAV:") do
         xml.L(:password, options[:new_password]) if options.include? :new_password
+        xml.L(:cur_password, options[:cur_password]) if options.include? :cur_password 
+
         xml.D(:displayname, options[:displayname]) if options.include? :displayname
         xml.L(:email, options[:email]) if options.include? :email
       end
