@@ -35,8 +35,8 @@ module REXML
 
       else
         
-        copy.attributes.prefixes.each do |p|
-          copy.add_namespace p, copy.attributes["xmlns:#{p}"]
+        copy.prefixes.each do |p|
+          copy.add_namespace p, copy.namespace(p)
         end
 
       end
