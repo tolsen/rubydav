@@ -207,6 +207,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   def test_transitively_adding_group_to_itself_fails
     group1_url = create_group 'testgroup1'
     group2_url = create_group 'testgroup2'
+    group3_url = create_group 'testgroup3'
 
     # add testgroup2 to testgroup1
     set_group_members group1_url, group2_url
@@ -216,12 +217,21 @@ class LimestonePrincipalTest < Test::Unit::TestCase
       set_group_members group2_url, group1_url
     end
     assert_equal "<\"200\"> expected but was\n<\"409\">.", excep.message
-    
+
+    # add testgroup3 to testgroup2
+    set_group_members group2_url, group3_url
+
+    # now try to add testgroup1 to testgroup3
+    excep = assert_raise(Test::Unit::AssertionFailedError) do
+      set_group_members group3_url, group1_url
+    end
+    assert_equal "<\"200\"> expected but was\n<\"409\">.", excep.message
+
     # cleanup
-    response = @request.delete group1_url, admincreds
-    assert_equal '204', response.status
-    response = @request.delete group2_url, admincreds
-    assert_equal '204', response.status
+    [group1_url, group2_url, group3_url].each do |group_url|
+      response = @request.delete group_url, admincreds
+      assert_equal '204', response.status
+    end
   end
 
   def test_bad_put_user_followed_by_smaller_good_put_user
