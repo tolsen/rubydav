@@ -87,6 +87,29 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     group_url
   end
 
+  def assert_group_members group_url, *members
+    response = @request.propfind(group_url, 0, :"group-member-set")
+    assert_equal '207', response.status
+    assert_xml_matches "<wrap>" + response[:"group-member-set"] + "</wrap>" do |xml|
+      xml.wrap {
+        xml.xmlns!({:D => "DAV:" })
+        members.each do |prin_url|
+          xml.D :href, baseuri + prin_url
+        end
+      }
+    end
+  end
+
+  def set_group_members group_url, *members
+    hrefxml = ::Builder::XmlMarkup.new()
+    members.each do |prin_url|
+      hrefxml.D(:href, baseuri + prin_url)
+    end
+    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml })
+    assert_equal '207',response.status
+    assert_equal '200', response.statuses(:"group-member-set")
+  end
+
   def test_extended_mkcol_for_creating_group
     group_url = create_group 'testgroup'
 
@@ -98,24 +121,10 @@ class LimestonePrincipalTest < Test::Unit::TestCase
 
   def test_adding_user_to_group
     group_url = create_group 'testgroup'
+    prin_url = get_principal_uri @creds[:username]
 
-    prin_uri = get_principal_uri(@creds[:username], baseuri)
-
-    hrefxml = ::Builder::XmlMarkup.new()
-    hrefxml.D(:href, prin_uri)
-
-    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert !response.error?
-    assert response[:"group-member-set"]
-
-    response = @request.propfind(group_url, 0, :"group-member-set")
-    assert_equal '207', response.status
-
-    assert_xml_matches response[:"group-member-set"] do |xml|
-      xml.xmlns! "DAV:"
-      xml.href prin_uri
-    end
+    set_group_members group_url, prin_url
+    assert_group_members group_url, prin_url
 
     response = @request.delete group_url, admincreds
     assert_equal '204', response.status
@@ -124,26 +133,18 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   def test_adding_group_to_itself_fails
     group_url = create_group 'testgroup'
 
-    group_uri = baseuri + group_url
+    excep = assert_raise(Test::Unit::AssertionFailedError) do
+      set_group_members group_url, group_url
+    end
+    assert_equal "<\"200\"> expected but was\n<\"409\">.", excep.message
+    
+    excep = assert_raise(Test::Unit::AssertionFailedError) do
+      prin_url = get_principal_uri(@creds[:username])
+      set_group_members group_url, group_url, prin_url
+    end
+    assert_equal "<\"200\"> expected but was\n<\"409\">.", excep.message
 
-    hrefxml = ::Builder::XmlMarkup.new()
-
-    hrefxml.D(:href, group_uri)
-    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert response.error?
-    assert_equal '409', response.statuses(:"group-member-set")
-
-    prin_uri = get_principal_uri(@creds[:username], baseuri)
-    hrefxml.D(:href, prin_uri)
-    response = @request.proppatch(group_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert response.error?
-    assert_equal '409', response.statuses(:"group-member-set")
-
-    response = @request.propfind(group_url, 0, :"group-member-set")
-    assert_equal '207', response.status
-    assert_equal "", response[:"group-member-set"]
+    assert_group_members group_url
 
     response = @request.delete group_url, admincreds
     assert_equal '204', response.status
@@ -153,24 +154,14 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     group1_url = create_group 'testgroup1'
     group2_url = create_group 'testgroup2'
 
-    group1_uri = baseuri + group1_url
-    group2_uri = baseuri + group2_url
-
-    hrefxml = ::Builder::XmlMarkup.new()
-
     # add test1 user to testgroup2
-    prin_uri = get_principal_uri(@creds[:username], baseuri)
-    hrefxml.D(:href, prin_uri)
-
-    response = @request.proppatch(group2_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert !response.error?
-    assert_equal '200', response.statuses(:"group-member-set")
+    prin_url = get_principal_uri @creds[:username]
+    set_group_members group2_url, prin_url
 
     @request.delete '/home/test2/testcol', testcreds
 
     # grant testgroup1 privileges to bind to /home/test2
-    ace = RubyDav::Ace.new(:grant, group1_uri, false, :bind)
+    ace = RubyDav::Ace.new(:grant, group1_url, false, :bind)
     acl = add_ace_and_set_acl '/home/test2/', ace, testcreds
 
     # make test1 user create a collection in /home/test2
@@ -178,12 +169,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     # add testgroup2 to testgroup1. test1 user should indirectly become a member of testgroup1
-    hrefxml = ::Builder::XmlMarkup.new()
-    hrefxml.D(:href, group2_uri)
-    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert !response.error?
-    assert_equal '200', response.statuses(:"group-member-set")
+    set_group_members group1_url, group2_url
 
     # make test1 user retry creating a collection in /home/test2
     response = @request.mkcol '/home/test2/testcol'
@@ -195,7 +181,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     # grant testgroup1 unbind privileges on /home/test2
-    ace = RubyDav::Ace.new(:grant, group1_uri, false, :unbind)
+    ace = RubyDav::Ace.new(:grant, group1_url, false, :unbind)
     acl = add_ace_and_set_acl '/home/test2/', ace, testcreds
 
     # make test1 user retry deleting
@@ -204,10 +190,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '204', response.status
 
     # remove testgroup2 from testgroup1. test1 user is no longer an indirect member of testgroup1
-    response = @request.proppatch(group1_url, {:"group-member-set" => "" })
-    assert_equal '207',response.status
-    assert !response.error?
-    assert_equal '200', response.statuses(:"group-member-set")
+    set_group_members group1_url
 
     # make test1 user create a collection in /home/test2
     response = @request.mkcol '/home/test2/testcol'
@@ -225,26 +208,15 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     group1_url = create_group 'testgroup1'
     group2_url = create_group 'testgroup2'
 
-    group1_uri = baseuri + group1_url
-    group2_uri = baseuri + group2_url
-
     # add testgroup2 to testgroup1
-    hrefxml = ::Builder::XmlMarkup.new()
-
-    hrefxml.D(:href, group2_uri)
-    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert_equal '200', response.statuses(:"group-member-set")
+    set_group_members group1_url, group2_url
 
     # now try to add testgroup1 to testgroup2
-    hrefxml = ::Builder::XmlMarkup.new()
-    hrefxml.D(:href, group1_uri)
-    response = @request.proppatch(group2_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    # assert failure
-    assert response.error?
-    assert_equal '409', response.statuses(:"group-member-set")
-
+    excep = assert_raise(Test::Unit::AssertionFailedError) do
+      set_group_members group2_url, group1_url
+    end
+    assert_equal "<\"200\"> expected but was\n<\"409\">.", excep.message
+    
     # cleanup
     response = @request.delete group1_url, admincreds
     assert_equal '204', response.status
@@ -273,37 +245,13 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     group3_url = create_group 'testgroup3'
     group4_url = create_group 'testgroup4'
 
-    group1_uri = baseuri + group1_url
-    group2_uri = baseuri + group2_url
-    group3_uri = baseuri + group3_url
-    group4_uri = baseuri + group4_url
-
     # add testgroup2 and testgroup4 to testgroup1
-    hrefxml = ::Builder::XmlMarkup.new()
-
-    hrefxml.D(:href, group2_uri)
-    hrefxml.D(:href, group4_uri)
-    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert_equal '200', response.statuses(:"group-member-set")
+    set_group_members group1_url, group2_url, group4_url
 
     # simultaneoulsy add testgroup3 and remove testgroup2 from testgroup1
-    hrefxml = ::Builder::XmlMarkup.new()
-    hrefxml.D(:href, group3_uri)
-    hrefxml.D(:href, group4_uri)
-    response = @request.proppatch(group1_url, {:"group-member-set" => hrefxml })
-    assert_equal '207',response.status
-    assert_equal '200', response.statuses(:"group-member-set")
+    set_group_members group1_url, group3_url, group4_url
 
-    response = @request.propfind(group1_url, 0, :"group-member-set")
-    assert_equal '207', response.status
-    assert_xml_matches "<wrap>" + response[:"group-member-set"] + "</wrap>" do |xml|
-      xml.wrap {
-        xml.xmlns!({:D => "DAV:" })
-        xml.D :href, group3_uri
-        xml.D :href, group4_uri
-      }
-    end
+    assert_group_members group1_url, group3_url, group4_url
 
     # cleanup
     [group1_url, group2_url, group3_url, group4_url].each do |group_url|
