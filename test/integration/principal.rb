@@ -77,13 +77,8 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     ace = RubyDav::Ace.new(:grant, :authenticated, false, :bind)
     acl = add_ace_and_set_acl '/groups', ace, admincreds
 
-    ob = Object.new
-    def ob.target!
-      "<D:principal/>"
-    end
-    response = @request.mkcol_ext group_url, {:resourcetype => ob}
+    response = @request.put group_url, StringIO.new("")
     assert_equal '201', response.status
-    assert_equal '200', response.statuses(:resourcetype)
     group_url
   end
 
@@ -110,10 +105,11 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '200', response.statuses(:"group-member-set")
   end
 
-  def test_extended_mkcol_for_creating_group
+  def test_put_for_creating_group
     group_url = create_group 'testgroup'
 
     response = @request.propfind(group_url, 0, :resourcetype)
+    assert_equal '207', response.status
     assert_match 'D:principal', response[:resourcetype]
 
     @request.delete group_url, admincreds
