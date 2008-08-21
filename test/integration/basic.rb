@@ -409,4 +409,70 @@ class WebDavBasicTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def test_pipelined_put_requests
+    RubyDav::Request.module_eval do
+      alias_method :request_orig, :request
+      def request *args
+        num_503_retries = 5
+        response = request_orig *args
+
+        while response.status == '503' and response.headers['retry-after'] and num_503_retries
+          num_503_retries -= 1
+          sleep(response.headers['retry-after'].to_s.to_i/100)
+          response = request_orig *args
+        end 
+        response
+      end
+    end
+
+    files = {}
+    20.times do |i|
+      filename = i.to_s
+      files[filename] = "Contents of file '#{filename}'"
+    end
+
+    files.instance_variable_set(:@req_creds, @creds.merge(:base_url => @host))
+    def files.each_request_in_diff_thread creds=@req_creds, &block
+      self.map do |file|
+        request = RubyDav::Request.new creds
+        Thread.new request, *file, &block
+      end.each {|thr| thr.join }
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.delete filename
+      assert ['204','404'].include?(response.status), "Deleting file #{filename}"
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.put filename, StringIO.new(filebody)
+      assert_equal '201', response.status, "Put new file #{filename}"
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.get filename
+      assert_equal '200', response.status, "Get on file #{filename}"
+      assert_equal filebody, response.body, "File body of #{filename}"
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.put filename, StringIO.new(filebody)
+      assert_equal '204', response.status, "Overwriting file #{filename}"
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.get filename
+      assert_equal '200', response.status, "Get on file #{filename}"
+      assert_equal filebody, response.body, "File body of #{filename}"
+    end
+
+    files.each_request_in_diff_thread do |request, filename, filebody|
+      response = request.delete filename
+      assert_equal '204', response.status, "Deleting file #{filename}"
+    end
+
+    RubyDav::Request.module_eval do
+      alias_method :request, :request_orig
+    end
+  end
 end

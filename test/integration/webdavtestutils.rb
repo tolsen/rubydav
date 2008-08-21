@@ -76,12 +76,14 @@ module WebDavTestUtils
   def add_ace_and_set_acl(resource, ace, creds={})
     acl = get_acl resource, creds
 
-    # prepend the new Ace
-    acl.unshift ace
+    unless acl.include? ace
+      # prepend the new Ace
+      acl.unshift ace
 
-    # set the access control properties of the resource
-    response = @request.acl(resource, acl, creds)
-    assert_equal '200', response.status
+      # set the access control properties of the resource
+      response = @request.acl(resource, acl, creds)
+      assert_equal '200', response.status
+    end
 
     return acl
   end
