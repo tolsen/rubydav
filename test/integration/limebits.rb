@@ -70,19 +70,25 @@ class WebDavBasicTest < Test::Unit::TestCase
 
   end
 
+  def test_null_lb_domain_map
+
+    lb_domain_map_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'domain-map')
+    prin_uri = get_principal_uri(@creds[:username])
+
+    response = @request.propfind(prin_uri, 0, lb_domain_map_propkey)
+    assert_equal '207', response.status
+    assert_equal '404', response.statuses(lb_domain_map_propkey) 
+
+  end
+
   def test_lb_domain_map_property
     new_coll 'new_root'
     new_file 'new_root/testfile', StringIO.new("test")
 
     lb_domain_map_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'domain-map')
     prin_uri = get_principal_uri(@creds[:username])
-    domain_map = String.new
-    xml ||= ::Builder::XmlMarkup.new(:indent => 2, :target => domain_map)
-    xml.lb 'domain-map-entry'.to_sym, "xmlns:lb" => "http://limebits.com/ns/1.0/" do
-      xml.lb(:domain, altdomain)
-      xml.lb(:path, '/new_root')
-    end
-  
+    xml = get_domain_map_xml altdomain, '/new_root' 
+      
     response = @request.proppatch(prin_uri, { lb_domain_map_propkey => xml })
     assert_equal '207', response.status
     assert !response.error?
@@ -122,5 +128,16 @@ class WebDavBasicTest < Test::Unit::TestCase
   def altdomain
     hosturi = URI.parse(@host)
     "localhost:" + hosturi.port.to_s
+  end
+
+  def get_domain_map_xml domain, path
+    domain_map = String.new
+    xml = ::Builder::XmlMarkup.new(:indent => 2, :target => domain_map)
+    xml.lb 'domain-map-entry'.to_sym, "xmlns:lb" => "http://limebits.com/ns/1.0/" do
+      xml.lb(:domain, domain)
+      xml.lb(:path, path)
+    end
+
+    return xml
   end
 end
