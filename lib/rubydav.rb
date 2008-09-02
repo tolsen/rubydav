@@ -1001,7 +1001,72 @@ module RubyDav
                           http_response.body, httpmethod)
     end
       
-    
+    def try_authenticated_request httpmethod, uri, stream, challenge_response, options
+      username, password, basic_creds, digest_a1, realm, force_basic_auth =
+        options.values_at(:username, :password, :basic_creds,
+                          :digest_a1, :realm, :force_basic_auth)
+
+      raise "need username or basic_creds set in options hash" if
+        !options.include?(:username) && !options.include?(:basic_creds)
+      
+      auth = basic_auth = digest_auth = nil
+
+      challenge_response.get_fields('WWW-Authenticate').each do |www_auth_hdr|
+        auth = Auth.construct www_auth_hdr
+        next if realm && auth.realm != realm
+        case auth
+        when DigestAuth
+          digest_auth = auth
+          break  # (sic) break out of the loop
+        when BasicAuth
+          basic_auth = auth if basic_auth.nil?
+        end
+      end
+
+      if digest_auth
+        auth = digest_auth
+
+        raise "must pass username for digest auth" if username.nil?
+        auth.username = username
+        
+        if digest_a1
+          auth.h_a1 = digest_a1
+        elsif password
+          auth.password = password
+        else
+          raise "must pass password or digest_a1 for Digest Auth"
+        end
+        
+      elsif basic_auth
+        
+        raise SecurityError, "Refusing to use basic auth over an unencrypted connection" unless
+          uri.is_a?(URI::HTTPS) || uri.host == "localhost" || force_basic_auth
+        auth = basic_auth
+
+        if basic_creds
+          auth.creds = basic_creds
+        elsif username && password
+          auth.username = username
+          auth.password = password
+        else
+          raise "must pass (username and password) or basic_creds for Basic Auth"
+        end
+      end
+
+      response = try_request(httpmethod, uri, stream, auth, options) if auth
+      
+
+      if auth
+        raise "server returned incorrect rspauth" if
+          (auth.is_a?(DigestAuth) &&
+           (auth_info = response.get_field('Authentication-Info')) &&
+           !auth.validate_auth_info(auth_info))
+
+        @auth_world.add_auth auth, uri.to_s, options unless realm && auth.realm != realm  
+      end
+
+      return response
+    end
     
     def request(httpmethod, url = "", stream = nil, options = {})
       if options.include? :destination
@@ -1013,79 +1078,17 @@ module RubyDav
         options[:content_type] = mimetype.nil? ? 'text/plain' : mimetype.type
       end
       
-      req_opts = @global_opts.merge options
-      uri = URI.join(req_opts[:base_url], url)
+      options = @global_opts.merge options
+      uri = URI.join(options[:base_url], url)
 
       
-      auth = @auth_world.get_auth uri.to_s, req_opts
+      auth = @auth_world.get_auth uri.to_s, options
+      response1 = try_request httpmethod, uri, stream, auth, options
 
-      username, password, basic_creds, digest_a1, realm, force_basic_auth =
-        req_opts.values_at(:username, :password, :basic_creds,
-                           :digest_a1, :realm, :force_basic_auth)
+      response2 = try_authenticated_request(httpmethod, uri, stream, response1, options) if
+        response1.unauthorized? && (options.include?(:username) || options.include?(:basic_creds))
 
-      response = try_request httpmethod, uri, stream, auth, req_opts
-
-      if response.unauthorized? && (username || basic_creds)
-        auth = nil
-        basic_auth = nil
-        digest_auth = nil
-
-        response.get_fields('WWW-Authenticate').each do |www_auth_hdr|
-          auth = Auth.construct www_auth_hdr
-          next if realm && auth.realm != realm
-          case auth
-          when DigestAuth
-            digest_auth = auth
-            break  # (sic) break out of the loop
-          when BasicAuth
-            basic_auth = auth if basic_auth.nil?
-          end
-        end
-
-        if digest_auth
-          auth = digest_auth
-
-          raise "must pass username for digest auth" if username.nil?
-          auth.username = username
-          
-          if digest_a1
-            auth.h_a1 = digest_a1
-          elsif password
-            auth.password = password
-          else
-            raise "must pass password or digest_a1 for Digest Auth"
-          end
-          
-        elsif basic_auth
-          
-          raise SecurityError, "Refusing to use basic auth over an unencrypted connection" unless
-            uri.is_a?(URI::HTTPS) || uri.host == "localhost" || force_basic_auth
-          auth = basic_auth
-
-          if basic_creds
-            auth.creds = basic_creds
-          elsif username && password
-            auth.username = username
-            auth.password = password
-          else
-            raise "must pass (username and password) or basic_creds for Basic Auth"
-          end
-        end
-
-        response = try_request(httpmethod, uri, stream, auth, req_opts) if auth
-        
-      end
-
-      if auth
-        raise "server returned incorrect rspauth" if
-          (auth.is_a?(DigestAuth) &&
-           (auth_info = response.get_field('Authentication-Info')) &&
-           !auth.validate_auth_info(auth_info))
-
-        @auth_world.add_auth auth, uri.to_s, req_opts unless realm && auth.realm != realm  
-      end
-
-      return response
+      return response2 || response1
     end
 
     def add_request_header request, options, key, &block
