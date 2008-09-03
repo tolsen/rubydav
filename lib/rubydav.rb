@@ -1006,9 +1006,6 @@ module RubyDav
         options.values_at(:username, :password, :basic_creds,
                           :digest_a1, :realm, :force_basic_auth)
 
-      raise "need username or basic_creds set in options hash" if
-        !options.include?(:username) && !options.include?(:basic_creds)
-      
       auth = basic_auth = digest_auth = nil
 
       response.get_fields('WWW-Authenticate').each do |www_auth_hdr|
@@ -1093,7 +1090,7 @@ module RubyDav
       response1 = try_request httpmethod, uri, stream, auth, options
 
       response2 = try_authenticated_request(httpmethod, uri, stream, response1, options) if
-        response1.unauthorized? && (options.include?(:username) || options.include?(:basic_creds))
+        response1.unauthorized? && (options[:username] || options[:basic_creds])
 
       # try a 3rd time if it's a 401 where the nonce is stale
       response3 = nil
