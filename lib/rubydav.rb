@@ -1000,8 +1000,8 @@ module RubyDav
       ResponseFactory.get(uri.path, http_response.code, http_response.to_hash,
                           http_response.body, httpmethod)
     end
-      
-    def try_authenticated_request httpmethod, uri, stream, challenge_response, options
+
+    def response_to_auth response, uri, options
       username, password, basic_creds, digest_a1, realm, force_basic_auth =
         options.values_at(:username, :password, :basic_creds,
                           :digest_a1, :realm, :force_basic_auth)
@@ -1011,7 +1011,7 @@ module RubyDav
       
       auth = basic_auth = digest_auth = nil
 
-      challenge_response.get_fields('WWW-Authenticate').each do |www_auth_hdr|
+      response.get_fields('WWW-Authenticate').each do |www_auth_hdr|
         auth = Auth.construct www_auth_hdr
         next if realm && auth.realm != realm
         case auth
@@ -1053,17 +1053,24 @@ module RubyDav
         end
       end
 
-      response = try_request(httpmethod, uri, stream, auth, options) if auth
+      return auth
+    end
+    
       
+      
+    def try_authenticated_request httpmethod, uri, stream, prev_response, options
+      auth, realm = options.values_at(:auth, :realm)
+      auth ||= response_to_auth prev_response, uri, options
+      return nil unless auth
+      
+      response = try_request(httpmethod, uri, stream, auth, options)      
 
-      if auth
-        raise "server returned incorrect rspauth" if
-          (auth.is_a?(DigestAuth) &&
-           (auth_info = response.get_field('Authentication-Info')) &&
-           !auth.validate_auth_info(auth_info))
+      raise "server returned incorrect rspauth" if
+        (auth.is_a?(DigestAuth) &&
+         (auth_info = response.get_field('Authentication-Info')) &&
+         !auth.validate_auth_info(auth_info))
 
-        @auth_world.add_auth auth, uri.to_s, options unless realm && auth.realm != realm  
-      end
+      @auth_world.add_auth auth, uri.to_s, options unless realm && auth.realm != realm  
 
       return response
     end
@@ -1088,7 +1095,16 @@ module RubyDav
       response2 = try_authenticated_request(httpmethod, uri, stream, response1, options) if
         response1.unauthorized? && (options.include?(:username) || options.include?(:basic_creds))
 
-      return response2 || response1
+      # try a 3rd time if it's a 401 where the nonce is stale
+      response3 = nil
+      if response2 && response2.unauthorized?
+        auth = response_to_auth response2, uri, options
+        response3 = try_authenticated_request(httpmethod, uri, stream, response2,
+                                              options.merge( :auth => auth )) if
+          auth && auth.stale?
+      end
+        
+      return response3 || response2 || response1
     end
 
     def add_request_header request, options, key, &block

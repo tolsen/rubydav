@@ -60,7 +60,7 @@ module RubyDav
 
   class DigestAuth < Auth
     attr_writer :h_a1
-    attr_reader :domain
+    attr_reader :domain, :stale
 
     def initialize realm_or_creds, www_authenticate = nil
       if www_authenticate.nil?
@@ -70,9 +70,12 @@ module RubyDav
         super realm_or_creds
         @challenge = HTTPAuth::Digest::Challenge.from_header www_authenticate
         @domain = @challenge.h[:domain]
+        @stale = @challenge.h[:stale]
         @salt = [[rand(2**30)].pack('N')].pack('m').chomp
       end
     end
+
+    def stale?() self.stale; end
 
     def authorization method, uri
       raise "username must be set before calling DigestAuth#authorization()" if @username.nil?

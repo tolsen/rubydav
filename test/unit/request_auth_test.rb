@@ -64,7 +64,7 @@ class RequestAuthTest < RubyDavUnitTestCase
 
     request = RubyDav::Request.new(:basic_creds => 'dGltOnN3b3JkZmlzaA==',
                                    :force_basic_auth => true)
-        
+    
     assert_valid_response request.get(@host)
   end
 
@@ -173,6 +173,21 @@ class RequestAuthTest < RubyDavUnitTestCase
     assert_equal '401', response.status
   end
 
+  def test_request_retries_stale_second_401
+    request = RubyDav::Request.new :username => 'tim', :password => 'swordfish'
+
+    flexmock(Net::HTTP).new_instances do |http|
+      add_unauth_expectation http
+      add_auth_expectation_returning_401(http, valid_digest_get, 'tim', 'swordfish',
+                                         @body, :default, true)
+      add_auth_expectation http, valid_digest_get
+      http.should_receive(:request).zero_or_more_times.ordered.and_return { flunk "too many requests made!" }
+    end
+
+    response = request.get @host
+    assert_equal '200', response.status
+  end
+
   def valid_ren_get() valid_digest_get 'ren', 'renpw'; end
   def valid_stimpy_get() valid_digest_get 'stimpy', 'stimpypw'; end
   
@@ -183,7 +198,7 @@ class RequestAuthTest < RubyDavUnitTestCase
   def add_stimpy_expectation http
     add_auth_expectation http, valid_stimpy_get, 'stimpy', 'stimpypw', @body, :stimpy
   end
-    
+  
   def test_request_auth_override
     request = RubyDav::Request.new :username => 'ren', :password => 'renpw'
 
@@ -288,11 +303,11 @@ class RequestAuthTest < RubyDavUnitTestCase
 
   def add_auth_expectation_returning_401(http, valid_get, username = 'tim',
                                          password = 'swordfish', body = @body,
-                                         nonce_key = :default)
+                                         nonce_key = :default, stale = false)
     http.should_receive(:request).once.ordered.with(valid_get).and_return do |req|
       @auth_request_count += 1
 
-      challenge = HTTPAuth::Digest::Challenge.new :realm => @realm
+      challenge = HTTPAuth::Digest::Challenge.new :realm => @realm, :stale => stale
       r = mock_response "401", nil, 'WWW-Authenticate' => challenge.to_header
       @nonces[nonce_key] = challenge.h[:nonce]
       r
