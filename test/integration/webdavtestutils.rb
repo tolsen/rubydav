@@ -1,4 +1,7 @@
+require 'test/unit/assertions'
+
 module WebDavTestUtils
+  include Test::Unit::Assertions
   
   # delete and mkcol new coll
   def new_coll(coll, creds={})

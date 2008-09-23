@@ -431,10 +431,10 @@ class WebDavBasicTest < Test::Unit::TestCase
       files[filename] = "Contents of file '#{filename}'"
     end
 
-    files.instance_variable_set(:@req_creds, @creds.merge(:base_url => @host))
-    def files.each_request_in_diff_thread creds=@req_creds, &block
+    files.instance_variable_set :@req_creds, @creds.merge(:base_url => @host)
+    def files.each_request_in_diff_thread &block
       self.map do |file|
-        request = RubyDav::Request.new creds
+        request = RubyDav::Request.new @req_creds
         Thread.new request, *file, &block
       end.each {|thr| thr.join }
     end
