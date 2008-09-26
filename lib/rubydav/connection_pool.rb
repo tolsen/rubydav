@@ -15,7 +15,7 @@ module RubyDav
       begin
         attempts += 1
         return self[uri].request(request)
-      rescue IOError
+      rescue IOError, Errno::ECONNRESET
         delete uri
         retry unless attempts >= MAX_ATTEMPTS
         raise
