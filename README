@@ -1,0 +1,14 @@
+1) To test LimeStone with RubyDav, please add tests to test/integration folder.
+
+You need to install the following gems:
+builder, testunitxml, shared-mime-info
+
+Debian/Ubuntu packages: libbsearch-ruby, shared-mime-info
+
+ruby test/integration/ts_webdav.rb -- -u test1 -p test1 -s http://localhost:8080/limespot/test1/
+
+Assuming LimeStone is running on localhost:8080
+
+2) RubyDav has Unit tests and Functional tests which can be run using rake.
+
+gems required: rcov, flexmock
