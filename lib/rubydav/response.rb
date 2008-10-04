@@ -819,6 +819,7 @@ module RubyDav
       ['207', :report_version_tree] => VersionMultiResponse,
       ['207', :report_expand_property] => PropMultiResponse,
       ['207', nil] => MultiStatusResponse,
+      ['302', nil] => RedirectionResponse,
       ['304', nil] => NotModifiedResponse,
       ['400', nil] => BadRequestError,
       ['401', nil] => UnauthorizedError,
