@@ -228,7 +228,7 @@ module RubyDav
   # client error response class, 4xx series
   class ClientErrorResponse < ErrorResponse
     include DavErrorHandler
-    attr_reader :dav_error
+    attr_reader :dav_error, :body
 
     def self.create(url, status, headers, body, method)
         root = REXML::Document.new(body).root
