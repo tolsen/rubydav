@@ -33,6 +33,30 @@ class WebDavSearchTest < Test::Unit::TestCase
     delete_file 'file'
   end
 
+  def test_search_resource_id
+    new_coll 'test-search-resource-id'
+    put_file_w_size 'test-search-resource-id/file', 64
+
+    where = _not(is_collection)
+    scope = { homepath + 'test-search-resource-id' => 1 }
+
+    response = @request.search('', scope, where, :'resource-id')
+    assert_equal '207', response.status
+
+    # search should return 1 result
+    assert_num_search_results 1, response
+
+    # result must contain file
+    fileresponse = response.responsehash[homepath + 'test-search-resource-id/file']
+    assert_not_nil fileresponse
+
+    # property resource-id must've been reported
+    assert_not_nil fileresponse.propertyhash[RubyDav::PropKey.strictly_prop_key(:'resource-id')]
+
+    # cleanup
+    delete_coll 'test-search-resource-id'
+  end
+
   def test_dead_prop_search
     file1 = 'file1'
     file2 = 'file2'
