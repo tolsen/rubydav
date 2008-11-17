@@ -323,6 +323,31 @@ class WebDavAclTest < Test::Unit::TestCase
     help_test_dav_property_aces(self_key)
   end
 
+  def test_ace_conflict
+    setup_acl
+
+    # add an ACE, so that we have something to test for
+    @acl << RubyDav::Ace.new(:grant, test_principal_uri, false, :write)
+    response = @request.acl(@testfile, @acl)
+    assert_equal '200', response.status
+
+    new_acl = RubyDav::Acl.new
+    new_acl << RubyDav::Ace.new(:grant, test_principal_uri, false, :all)
+    new_acl << RubyDav::Ace.new(:deny, test_principal_uri, false, :all)
+
+    # setting conflicting ACEs should result in 409
+    response = @request.acl(@testfile, new_acl)
+    assert_equal '409', response.status
+    
+    # test that the ACL did not change
+    response = @request.propfind_acl(@testfile, 0)
+    assert_equal '207', response.status
+    assert @acl.eq? response.acl
+
+    ensure
+    teardown_acl
+  end
+
   def test_acl_preconditions
     setup_acl
     
