@@ -682,7 +682,7 @@ module RubyDav
     # * appropriate error response
     def proppatch(url, props, options={})
       requestbody = String.new
-      xml ||= RubyDav::XmlBuilder.generate(requestbody)
+      xml = RubyDav::XmlBuilder.generate(requestbody)
       
       setprops = props.reject{|propkey, value| (:remove == value)|| (nil == value) }
       removeprops = props.reject{|propkey, value| :remove != value}
@@ -901,6 +901,34 @@ module RubyDav
       request :search, url, bodystream, options
     end
 
+    def mkredirectref(url, reftarget, options={})
+        requestbody = String.new
+        xml = RubyDav::XmlBuilder.generate(requestbody)
+
+        xml.D(:mkredirectref, "xmlns:D" => "DAV:") do
+            xml.D(:reftarget) do
+                xml.D(:href, reftarget)
+            end
+            xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
+        end
+
+        bodystream = StringIO.new(requestbody)
+        request :mkredirectref, url, bodystream, options
+    end
+
+    def updateredirectref(url, options={})
+        requestbody = String.new
+        xml = RubyDav::XmlBuilder.generate(requestbody)
+
+        xml.D(:updateredirectref, "xmlns:D" => "DAV:") do
+            xml.D(:reftarget) { xml.D(:href, options[:reftarget]) } if options[:reftarget]
+            xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
+        end
+
+        bodystream = StringIO.new(requestbody)
+        request :updateredirectref, url, bodystream, options
+    end
+
     def self.clone_class_from_instance_methods *method_syms
       anon_module = Module.new do
         method_syms.each do |method|
@@ -922,6 +950,7 @@ module RubyDav
                                       :get,
                                       :lock,
                                       :mkcol,
+                                      :mkredirectref,
                                       :move,
                                       :post,
                                       :propfind,
@@ -934,6 +963,7 @@ module RubyDav
                                       :unbind,
                                       :uncheckout,
                                       :unlock,
+                                      :updateredirectref,
                                       :version_control
                                       )
     
@@ -983,6 +1013,10 @@ module RubyDav
         cookies = []
         v.each{|n,v| cookies << ""+n.to_s+"="+v }
         cookies.join ","
+      end
+
+      add_request_header(request, options, :apply_to_redirect_ref) do |v|
+        v ? "T" : "F"
       end
 
       unless stream.nil?

@@ -78,6 +78,13 @@ module RubyDav
 
   # redirect response class, 3xx series
   class RedirectionResponse < Response
+    def redirectref
+        headers["redirect-ref"][0]
+    end
+
+    def location
+        headers["location"][0]
+    end
   end
 
   # error response class, 4xx and 5xx series
@@ -367,14 +374,10 @@ module RubyDav
 
   # redirect response class, status 301
   class MovedPermanentlyResponse < RedirectionResponse #:nodoc:
-    def location
-    end
   end
 
   # redirect response class, status 302
   class FoundResponse < RedirectionResponse #:nodoc:
-    def location
-    end
   end
 
   # redirect response class, status 304
@@ -819,7 +822,8 @@ module RubyDav
       ['207', :report_version_tree] => VersionMultiResponse,
       ['207', :report_expand_property] => PropMultiResponse,
       ['207', nil] => MultiStatusResponse,
-      ['302', nil] => RedirectionResponse,
+      ['301', nil] => MovedPermanentlyResponse,
+      ['302', nil] => FoundResponse,
       ['304', nil] => NotModifiedResponse,
       ['400', nil] => BadRequestError,
       ['401', nil] => UnauthorizedError,
