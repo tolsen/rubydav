@@ -57,6 +57,26 @@ class WebDavRedirectTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def test_updateredirectref
+    # create a redirectref
+    response = @request.mkredirectref('test-update', 'http://www.example.com')
+    assert_equal '201', response.status
+
+    # update reftarget and lifetime
+    response = @request.updateredirectref('test-update', { :reftarget => 'http://example.com', :lifetime => :permanent, :apply_to_redirect_ref => true })
+    assert_equal '200', response.status
+
+    # check the DAV:reftarget, DAV:redirect-lifetime properties
+    response = @request.propfind('test-update', 0, :reftarget, :"redirect-lifetime", :apply_to_redirect_ref => true)
+    assert_equal '207', response.status
+    assert_xml_txt_equal '<D:href xmlns:D="DAV:">http://example.com</D:href>', response.propertyhash[reftarget_key]
+    assert_xml_txt_equal '<D:permanent xmlns:D="DAV:"/>', response.propertyhash[redirect_lifetime_key]
+
+    # cleanup
+    response = @request.delete('test-update', :apply_to_redirect_ref => true)
+    assert_equal '204', response.status
+  end 
+
   def reftarget_key
     RubyDav::PropKey.get("DAV:", "reftarget")
   end
