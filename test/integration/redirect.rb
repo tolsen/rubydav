@@ -75,7 +75,23 @@ class WebDavRedirectTest < Test::Unit::TestCase
     # cleanup
     response = @request.delete('test-update', :apply_to_redirect_ref => true)
     assert_equal '204', response.status
-  end 
+  end
+
+  def test_redirect_ref_to_collection
+    # create a redirectref
+    response = @request.mkredirectref('test-collection', 'http://www.example.com')
+    assert_equal '201', response.status
+
+    # test that we get 302 with the right headers
+    response = @request.get('test-collection/collection/1')
+    assert_equal '302', response.status
+    assert_equal 'http://www.example.com/collection/1', response.location
+    assert_equal 'http://www.example.com/collection/1', response.redirectref
+
+    # cleanup
+    response = @request.delete('test-collection', :apply_to_redirect_ref => true)
+    assert_equal '204', response.status
+  end
 
   def reftarget_key
     RubyDav::PropKey.get("DAV:", "reftarget")
