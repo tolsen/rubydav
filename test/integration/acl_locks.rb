@@ -46,7 +46,7 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     # create a new lknull resource
     lockinfo = RubyDav::LockInfo.new(:depth => 0)
     response = @request.lock(lknull_res, lockinfo)
-    assert_equal '201', response.status
+    assert_equal '200', response.status
     response.lockinfo
   end
 
