@@ -39,7 +39,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # create a exclusive write locked null resource
     lockinfo = RubyDav::LockInfo.new(:depth => 0)
     response = @request.lock('coll', lockinfo)
-    assert_equal '201', response.status
+    assert_equal '200', response.status
 
     # repeat the above operation and assert that it fails with 423 #8.10.7
     # try lock refresh with wrong token and assert failure with 413 #8.10.7
@@ -76,7 +76,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # create a exclusive write locked null resource
     lockinfo = RubyDav::LockInfo.new(:depth => 0)
     response = @request.lock('locknull', lockinfo)
-    assert_equal '201', response.status
+    assert_equal '200', response.status
 
     # store the lock token returned by the server
     lockinfo = response.lockinfo
@@ -100,7 +100,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # create a exclusive write locked null resource
     lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
     response = @request.lock('locknull', lockinfo)
-    assert_equal '201', response.status
+    assert_equal '200', response.status
 
     # store the lock token returned by the server
     lockinfo1 = response.lockinfo
