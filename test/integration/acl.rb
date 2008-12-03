@@ -608,8 +608,7 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     inherited_ace = inherited_acl.first
-    parent = inherited_ace.url
-    parent_uri = baseuri + parent
+    parent_uri = inherited_ace.url
 
     # grant read to 'test' on parent
     ace = RubyDav::Ace.new(:grant, test_principal_uri, false, :read)

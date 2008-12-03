@@ -76,17 +76,18 @@ class WebDavPropsTest < Test::Unit::TestCase
     response = @request.delete('file')
     response = @request.put('file', @stream)
     assert_equal '201',response.status
+    ns = 'http://example.org/mynamespace'
     
     #PROPPATCH
-    response = @request.proppatch('file', { RubyDav::PropKey.get('http://example.org/mynamespace', 'author') => 'myname'})
+    response = @request.proppatch('file', { RubyDav::PropKey.get(ns, 'author') => 'myname'})
     assert_equal '207',response.status
     assert !response.error?
-    assert response.propertyhash[RubyDav::PropKey.get('http://example.org/mynamespace', 'author')]
+    assert response.propertyhash[RubyDav::PropKey.get(ns, 'author')]
     
-    response = @request.propfind('file',0, :displayname, RubyDav::PropKey.get('http://example.org/mynamespace', 'author'))
+    response = @request.propfind('file', 0, :allprop)
     assert_equal '207',response.status
     
-    assert_equal 'myname', response.propertyhash[RubyDav::PropKey.get('http://example.org/mynamespace', 'author')].strip
+    assert_equal 'myname', response.propertyhash[RubyDav::PropKey.get(ns, 'author')].strip
     
     response = @request.delete('file')
     response = @request.get('file')
