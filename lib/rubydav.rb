@@ -990,7 +990,7 @@ module RubyDav
       end
 
       add_request_header request, options, :timeout do |v|
-        v == INFINITY ? 'Infinite, Second-4100000000' : 'Second-' + timeout.to_s
+        v == INFINITY ? 'Infinite, Second-4100000000' : 'Second-' + v.to_s
       end
 
       add_request_header(request, options, :lock_token) { |v| "<#{v}>" }

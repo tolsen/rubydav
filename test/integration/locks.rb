@@ -133,7 +133,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('locknull')
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
+    lockinfo = RubyDav::LockInfo.new(:depth => 0)
     response = @request.lock('locknull', lockinfo)
     assert_equal '200', response.status
 
@@ -156,6 +156,46 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.propfind_cups('', 1)
     assert_nil response.children['locknull']
   end
+
+  def test_move_on_locknull
+    # ensure that locknull file doesn't exist
+    response = @request.delete('locknull')
+
+    # create a exclusive write locked null resource
+    lockinfo = RubyDav::LockInfo.new(:depth => 0)
+    response = @request.lock('locknull', lockinfo)
+    assert_equal '200', response.status
+
+    lockinfo = response.lockinfo
+
+    response = @request.move('locknull', 'nulllock')
+    assert_equal '404', response.status
+
+    response = @request.unlock('locknull', lockinfo.token)
+    assert_equal '204', response.status
+    
+    response = @request.propfind_cups('', 1)
+    assert_nil response.children['locknull']
+  end
+
+  def test_expired_locknull
+    res_name = 'locknull_for_exp'
+    response = @request.delete res_name
+
+    # create a exclusive write locked null resource
+    lockinfo = RubyDav::LockInfo.new(:depth => 0, :timeout => 2)
+    response = @request.lock(res_name, lockinfo)
+    assert_equal '200', response.status
+
+    # wait for the lock to expire
+    sleep 4
+
+    response = @request.propfind(res_name, 0, :displayname)
+    assert_equal '404', response.status
+    
+    response = @request.propfind_cups('', 1)
+    assert_nil response.children[res_name]
+ end
 
   # check that lock on collection will fail if we don't have permissions on a child
   # rfc2518bis-draft-18 #rfc.section.9.10.9
