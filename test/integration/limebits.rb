@@ -101,6 +101,19 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     assert_equal '207', response.status
   end
 
+  def test_rename_updates_mime_type
+    new_file 'test', StringIO.new('#include <stdio.h>')
+
+    response = @request.move('test', 'test.html', true)
+    assert_equal '201', response.status
+    
+    response = @request.get('test.html')
+    assert_equal '200', response.status
+    assert_equal 'text/html', response.headers["content-type"][0]
+
+    delete_file 'test.html'
+  end
+
   def set_and_test_domain_map uri, domain_map
     xml = get_domain_map_xml domain_map
     response = @request.proppatch(uri, { lb_domain_map_propkey => xml })
