@@ -409,6 +409,11 @@ class WebDavBasicTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def test_special_character_filenames
+    new_file 'test~', StringIO.new("test")
+    delete_file 'test~'
+  end
+
   def test_pipelined_put_requests
     RubyDav::Request.module_eval do
       alias_method :request_orig, :request
