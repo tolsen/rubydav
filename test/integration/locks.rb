@@ -128,6 +128,35 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_nil response.children['locknull']
   end
 
+  def test_propfind_on_locknull
+    # ensure that locknull file doesn't exist
+    response = @request.delete('locknull')
+
+    # create a exclusive write locked null resource
+    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
+    response = @request.lock('locknull', lockinfo)
+    assert_equal '200', response.status
+
+    # store the lock token returned by the server
+    lockinfo = response.lockinfo
+
+    response = @request.propfind('locknull', 0, :creationdate, :displayname, :resourcetype, :"resource-id")
+    assert_equal '207', response.status
+    assert response[:"resource-id"].strip.length > 0
+
+    response = @request.propfind('', 1, :creationdate, :displayname, :resourcetype, :"resource-id")
+    locknull_response = response.children['locknull']
+    assert_not_nil locknull_response
+
+    assert locknull_response[:"resource-id"].strip.length > 0
+
+    response = @request.unlock('locknull', lockinfo.token)
+    assert_equal '204', response.status
+    
+    response = @request.propfind_cups('', 1)
+    assert_nil response.children['locknull']
+  end
+
   # check that lock on collection will fail if we don't have permissions on a child
   # rfc2518bis-draft-18 #rfc.section.9.10.9
   def test_multi_resource_lock_forbidden

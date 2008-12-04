@@ -236,10 +236,12 @@ class WebDavPropsTest < Test::Unit::TestCase
 
   def test_displayname
     new_file 'testfile', StringIO.new("test")
-    dname_pkey = RubyDav::PropKey.get("DAV:", "displayname")
     
     response = @request.propfind('testfile', 0, :displayname)
     assert_equal '207', response.status
-    assert_equal '', response.propertyhash[dname_pkey]
+    assert_equal '', response[:displayname]
+
+    # cleanup
+    delete_file 'testfile'
   end
 end
