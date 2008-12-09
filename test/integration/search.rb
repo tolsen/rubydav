@@ -362,6 +362,24 @@ END_OF_WHERE
     delete_file 'file2'
   end
 
+  def test_search_dead_property_with_special_characters
+    new_file 'test_search', StringIO.new("test")
+
+    dead_pkey = RubyDav::PropKey.get('http://www.example.com/ns', 'special-dead')
+    response = @request.proppatch('test_search', { dead_pkey => 'test' })
+    assert_equal '207', response.status
+
+    # search for the special-dead property
+    where = eq(dead_pkey, 'test')
+    scope = { homepath => :infinity }
+    response = @request.search('', scope, where, dead_pkey)
+
+    # search should return 1 result
+    assert_num_search_results 1, response
+
+    # cleanup
+    delete_file 'test_search'
+  end
 
   def assert_num_search_results exp, response
     assert_equal exp+1, response.responses.length
