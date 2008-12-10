@@ -95,4 +95,9 @@ alwaysuselastest set to false
 alwaysuselastest set to false; fix REPO
 alwaysuselastest set to false; retry
 alwaysuselastest set to false; retry
+<<<<<<< HEAD:gittest
+alwaysuselastest set to False; added logging
+=======
+test by tim
+>>>>>>> 1f1a31be7e58c64545836a3f1cb44a86e5378d53:gittest
 alwaysuselastest set to False; added logging
