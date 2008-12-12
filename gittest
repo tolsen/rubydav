@@ -112,3 +112,4 @@ test killall fixed build with custom scheduler
 test stop-all
 test
 test
+test update supers
