@@ -32,6 +32,30 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def test_put_on_locknull
+    response = @request.delete('locknull')
+
+    lockinfo = RubyDav::LockInfo.new(:depth => 0)
+    response = @request.lock('locknull', lockinfo)
+    assert_equal '200', response.status
+
+    lockinfo = response.lockinfo
+
+    if_hdr = { 'locknull' => lockinfo.token }
+    response = @request.put('locknull', StringIO.new("test"), :if => if_hdr)
+    assert_equal '201', response.status
+
+    response = @request.unlock('locknull', lockinfo.token)
+    assert_equal '204', response.status
+
+    response = @request.get('locknull')
+    assert_equal '200', response.status
+    assert_equal 'test', response.body
+
+    response = @request.delete 'locknull'
+    assert_equal '204', response.status
+  end
+
   def test_locknull_mkcol
     # ensure that coll doesn't exist
     response = @request.delete('coll')

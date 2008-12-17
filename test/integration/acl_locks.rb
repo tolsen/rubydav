@@ -37,6 +37,37 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     response = @request.unlock(lknull_res, lockinfo.token)
   end
 
+  def test_locknull_requires_bind
+    lknl_file = 'testcol/lknull'
+    lockinfo = RubyDav::LockInfo.new(:depth => 0)
+
+    response = @request.mkcol('testcol')
+    assert_equal '201', response.status
+
+    response = @request.lock(lknl_file, lockinfo, :username => nil)
+    assert_equal '401', response.status
+
+    ace = RubyDav::Ace.new(:grant, :unauthenticated, false, :bind)
+    add_ace_and_set_acl 'testcol', ace
+    
+    response = @request.lock(lknl_file, lockinfo, :username => nil)
+    assert_equal '200', response.status
+    lockinfo = response.lockinfo
+
+    # the lock token provided is actually owned by the principal DAV:unauthenticated. hence the 423
+    response = @request.put(lknl_file, StringIO.new("test"), :if => {lknl_file => lockinfo.token})
+    assert_equal '423', response.status
+
+    response = @request.unlock(lknl_file, lockinfo.token, :username => nil)
+    assert_equal '204', response.status
+
+    response = @request.delete(lknl_file)
+    assert_equal '404', response.status
+
+    response = @request.delete('testcol')
+    assert_equal '204', response.status
+  end
+
   def locknull_setup(lknull_res)
     # ensure lknull doesn't exist
     response = @request.delete(lknull_res)
