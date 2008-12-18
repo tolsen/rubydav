@@ -29,7 +29,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert response.error?
 
     # sanity check, try to propfind the principal url, should get 404
-    response = @request.propfind(get_principal_uri('cartman2'), 0, :displayname )
+    response = @request.propfind(get_principal_uri('cartman'), 0, :displayname )
     assert_equal '404', response.status
   end
 
