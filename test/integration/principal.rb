@@ -24,6 +24,15 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'cartman'
   end
 
+  def _test_create_user_requires_displayname
+    response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :email => 'cartman@example.com'})
+    assert response.error?
+
+    # sanity check, try to propfind the principal url, should get 404
+    response = @request.propfind(get_principal_uri('cartman2'), 0, :displayname )
+    assert_equal '404', response.status
+  end
+
   def test_put_for_updating_displayname
     response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
