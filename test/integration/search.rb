@@ -381,6 +381,30 @@ END_OF_WHERE
     delete_file 'test_search'
   end
 
+  def test_search_namespaces
+    new_file 'test_search', StringIO.new("test")
+
+    # search for DAV:owner
+    where = _not(is_collection)
+    scope = { homepath => :infinity }
+    responses = @request.search('', scope, where, :owner)
+    assert_num_search_results 1, responses
+    response = responses.responsehash[homepath + 'test_search']
+    assert_not_nil response
+    assert_not_nil response.propertyhash[RubyDav::PropKey.strictly_prop_key(:owner)]
+
+    # now search for owner property with incorrect namespace
+    bad_ns_owner_pkey = RubyDav::PropKey.get('http://www.example.com/ns', 'owner')
+    responses = @request.search('', scope, where, bad_ns_owner_pkey)
+    assert_num_search_results 1, responses
+    response = responses.responsehash[homepath + 'test_search']
+    assert_not_nil response
+    assert_equal '404', response.statuses(bad_ns_owner_pkey)
+
+    # cleanup
+    delete_file 'test_search'
+  end
+
   def assert_num_search_results exp, response
     assert_equal exp+1, response.responses.length
   end
