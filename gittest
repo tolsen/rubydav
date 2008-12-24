@@ -126,3 +126,7 @@ test pre-receive
 test pre-receive
 test pre-receive
 test lock
+test lock
+test lock
+test lock
+test lock
