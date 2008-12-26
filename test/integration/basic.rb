@@ -264,6 +264,40 @@ class WebDavBasicTest < Test::Unit::TestCase
     response = @request.put('foo', StringIO.new("test6"), :if_match => etag1)
     assert_equal '412', response.status
     assert_content_equals "test5", 'foo'
+
+    ensure
+    delete_file 'foo'
+  end
+
+  def test_etag_match_gzip
+
+    # create a new file
+    response = @request.put('foo', StringIO.new("test1"))
+    assert_equal '201', response.status
+
+    # get the gzip'ed entity & corresponding etag
+    response = @request.get('foo', :accept_encoding => "gzip")
+    assert_equal '200', response.status
+    etag = response.headers['etag'][0]
+
+    # check positive if_none_match etag matching with the etag for the gzip'ed entity
+    response = @request.get('foo', :if_none_match => etag)
+    assert_equal '304', response.status
+
+    # check positive if_match etag matching with the etag for the gzip'ed entity
+    response = @request.put('foo', StringIO.new("test2"), :if_match => etag)
+    assert_equal '204', response.status
+
+    # check negative if_none_match etag matching with the etag for the gzip'ed entity
+    response = @request.get('foo', :if_none_match => etag)
+    assert_equal '200', response.status
+
+    # check negative if_match etag matching with the etag for the gzip'ed entity
+    response = @request.put('foo', StringIO.new("test3"), :if_match => etag)
+    assert_equal '412', response.status
+
+    ensure
+    delete_file 'foo'
   end
 
   def test_delete_unmodified
