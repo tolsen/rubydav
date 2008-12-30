@@ -696,7 +696,7 @@ class WebDavAclTest < Test::Unit::TestCase
     delete_file 'file'
   end
 
-  def _test_aces_inherited_from_root_are_marked_as_inherited
+  def test_aces_inherited_from_root_are_marked_as_inherited
     new_file 'file'
 
     response = @request.acl('/', RubyDav::Acl.new, admincreds)
