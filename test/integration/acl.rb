@@ -696,5 +696,34 @@ class WebDavAclTest < Test::Unit::TestCase
     delete_file 'file'
   end
 
+  def test_aces_inherited_from_root_are_marked_as_inherited
+    new_file 'file'
 
+    response = @request.acl('/', RubyDav::Acl.new, admincreds)
+    assert_equal '200', response.status
+
+    response1 = @request.propfind_acl('file', 0)
+    assert_equal '200', response1.statuses(:acl)
+    assert_equal 0, response1.acl.length
+
+    acl = RubyDav::Acl.new
+    ace = RubyDav::Ace.new(:grant, :authenticated, false, 'read', 'read-current-user-privilege-set')
+    acl << ace
+    
+    response = @request.acl('/', acl, admincreds)
+    assert_equal '200', response.status
+    
+    response2 = @request.propfind_acl('file', 0)
+    assert_equal '200', response2.statuses(:acl)
+
+    response = @request.acl('/', RubyDav::Acl.new, admincreds)
+    assert_equal '200', response.status
+
+    assert_equal response1.protected_acl.length, response2.protected_acl.length
+
+    assert_equal 0, response2.acl.length
+    assert_equal((response1.inherited_acl.length + 1), response2.inherited_acl.length)
+
+    delete_file 'file'
+  end
 end

@@ -1019,6 +1019,8 @@ module RubyDav
         v ? "T" : "F"
       end
 
+      add_request_header(request, options, :accept_encoding)
+
       unless stream.nil?
         add_request_header request, options, :content_type
         request.add_field('Expect', '100-continue')
