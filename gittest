@@ -18,7 +18,7 @@ another test
 another test DOO
 another test
 another test
-test git lock with super-commit - does it trigger a build?
+test git lock with super-commit - does it trigger a build? - nope.
 another test
 test QQQ
 test
