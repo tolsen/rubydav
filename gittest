@@ -22,6 +22,7 @@ test git lock with super-commit - does it trigger a build? - nope.
 ick
 FIXED no trigger (repo not recognixzed as super)
 NO trigger of pushed super
+FIXED?
 another test
 test QQQ
 test
