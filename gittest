@@ -1,4 +1,11 @@
+<<<<<<< HEAD:gittest
 PUSH THIS!
+Once more
+SUPERTEST
+TESTOMH
+WOO
+SOO
+WHOO
 test UP HERE
 foo
 test
@@ -8,16 +15,25 @@ another test NONE AT ALL
 another test
 another test
 another test
+FOO
 another test NO CON
-another test
+another test NO CON
 another test
 another test
 another test
 another test HOOCHIE!
 another test
 another test DOO
+COOCOO
 another test
 another test
+test git lock with super-commit - does it trigger a build? - nope.
+ick
+FIXED no trigger (repo not recognixzed as super)
+NO trigger of pushed super
+FIXED?
+NOW?
+YEAH.
 another test
 test QQQ
 test
@@ -97,11 +113,8 @@ alwaysuselastest set to false
 alwaysuselastest set to false; fix REPO
 alwaysuselastest set to false; retry
 alwaysuselastest set to false; retry
-<<<<<<< HEAD:gittest
 alwaysuselastest set to False; added logging
-=======
 test by tim
->>>>>>> 1f1a31be7e58c64545836a3f1cb44a86e5378d53:gittest
 alwaysuselastest set to False; added logging
 alwaysuselastest set to False; added logging
 test custom scheduler
