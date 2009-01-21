@@ -521,6 +521,40 @@ class WebDavDeltavTest < Test::Unit::TestCase
     delete_coll 'dstcol'
   end
 
+  def test_copy_on_collection_containing_checked_in_vcr_with_av_checkout_checkin
+
+    new_coll 'dstcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D :"checkout-checkin"
+
+    @request.proppatch('dstcol', {lb_av_new_children_propkey => av_val})
+
+    new_file 'dstcol/file', @stream
+    check_postcond_dav_put_under_version_control('dstcol/file')
+
+    response = @request.propfind('dstcol/file', 0, :"checked-in")
+    current_version = href_elem_to_url response[:"checked-in"]
+    versions_col = File.dirname current_version
+    version_num = File.basename(current_version).to_i
+
+    new_coll 'srccol'
+    new_file('srccol/file', StringIO.new("srccol/file"))
+    new_file('srccol/file2', StringIO.new("srccol/file2"))
+
+    response = @request.copy 'srccol', 'dstcol', RubyDav::INFINITY, true
+    assert_equal '204', response.status
+
+    response = @request.propfind('dstcol/file', 0, :"checked-in")
+    new_version = href_elem_to_url response[:"checked-in"]
+
+    assert_equal (versions_col + "/#{version_num+1}"), new_version
+
+    delete_coll 'srccol'
+    delete_coll 'dstcol'
+  end
+
   def test_av_new_children_inherited_and_used_at_copy_destination_for_new_children_only
     new_coll 'dstcol'
     new_file('dstcol/file2', StringIO.new("dstcol/file2"))
