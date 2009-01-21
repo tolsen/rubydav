@@ -277,4 +277,290 @@ class WebDavDeltavTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def test_auto_version_new_children_property
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    response = @request.propfind('testcol', 0, lb_av_new_children_propkey)
+    assert_equal '207', response.status
+    assert_equal '404', response.statuses(lb_av_new_children_propkey)
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"checkout-checkin")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    response = @request.propfind('testcol', 0, lb_av_new_children_propkey)
+    assert_equal '207', response.status
+    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+
+    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"checkout-checkin"
+    end
+
+    delete_coll 'testcol'
+  end
+
+  def test_av_new_children_inherited_by_child_collections
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"checkout-checkin")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    response = @request.mkcol 'testcol/childcol'
+    assert '201', response.status
+
+    response = @request.propfind('testcol/childcol', 0, lb_av_new_children_propkey)
+    assert_equal '207', response.status
+    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+
+    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"checkout-checkin"
+    end
+
+    delete_coll 'testcol'
+  end
+
+  def test_av_new_children_version_control
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.lb(:"version-control", "xmlns:lb" => "http://limebits.com/ns/1.0/")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    new_file 'testcol/file', @stream
+
+    check_postcond_dav_put_under_version_control('testcol/file')
+
+    response = @request.propfind('testcol/file', 0, :"auto-version")
+    assert_equal '404', response.statuses(:"auto-version")
+
+    delete_coll 'testcol'
+  end
+
+  def helper_test_auto_version_checkout_checkin filename
+    response = @request.propfind(filename, 0, :"checked-in")
+    current_version = href_elem_to_url response[:"checked-in"]
+
+    versions_col = File.dirname current_version
+    version_num = File.basename(current_version).to_i
+
+    response = @request.put filename, StringIO.new("testcontent")
+    assert_equal '204', response.status
+
+    response = @request.propfind(filename, 0, :"checked-in")
+    new_version = href_elem_to_url response[:"checked-in"]
+
+    assert_equal (versions_col + "/#{version_num+1}"), new_version
+  end
+
+  def test_av_new_children_checkout_checkin
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"checkout-checkin")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    new_file 'testcol/file', @stream
+
+    check_postcond_dav_put_under_version_control('testcol/file')
+
+    response = @request.propfind('testcol/file', 0, :"auto-version")
+    assert_equal '200', response.statuses(:"auto-version")
+
+    assert_xml_matches(response[:"auto-version"]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"checkout-checkin"
+    end
+
+    helper_test_auto_version_checkout_checkin 'testcol/file'
+
+    delete_coll 'testcol'
+  end
+
+  def helper_test_auto_version_checkout_unlocked_checkin filename
+    response = @request.propfind(filename, 0, :"checked-in")
+    current_version = href_elem_to_url response[:"checked-in"]
+
+    versions_col = File.dirname current_version
+    version_num = File.basename(current_version).to_i
+
+    response = @request.put filename, StringIO.new("testcontent")
+    assert_equal '204', response.status
+
+    response = @request.propfind(filename, 0, :"checked-in")
+    new_version = href_elem_to_url response[:"checked-in"]
+
+    assert_equal (versions_col + "/#{version_num+1}"), new_version
+
+    # TODO: take a lock and retry the request. check that resource is in checked-out status this time
+  end
+
+  def _test_av_new_children_checkout_unlocked_checkin
+    # FIXME: make this test work
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"checkout-unlocked-checkin")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    new_file 'testcol/file', @stream
+
+    check_postcond_dav_put_under_version_control('testcol/file')
+
+    response = @request.propfind('testcol/file', 0, :"auto-version")
+    assert_equal '200', response.statuses(:"auto-version")
+    assert_xml_matches(response[:"auto-version"]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"checkout-unlocked-checkin"
+    end
+
+    helper_test_auto_version_checkout_unlocked_checkin 'testcol/file'
+
+    delete_coll 'testcol'
+  end
+
+  def helper_test_auto_version_checkout
+
+  end
+
+  def _test_av_new_children_checkout
+    # FIXME: make this test work
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"checkout")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    new_file 'testcol/file', @stream
+
+    check_postcond_dav_put_under_version_control('testcol/file')
+
+    response = @request.propfind('testcol/file', 0, :"auto-version")
+    assert_equal '200', response.statuses(:"auto-version")
+    assert_xml_matches(response[:"auto-version"]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"checkout"
+    end
+
+    delete_coll 'testcol'
+  end
+
+  def _test_av_new_children_locked_checkout
+    # FIXME: make this test work
+    new_coll 'testcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+
+    av_val = ::Builder::XmlMarkup.new
+    av_val.D(:"locked-checkout")
+
+    response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
+    assert response.propertyhash[lb_av_new_children_propkey]
+
+    new_file 'testcol/file', @stream
+
+    check_postcond_dav_put_under_version_control('testcol/file')
+
+    response = @request.propfind('testcol/file', 0, :"auto-version")
+    assert_equal '200', response.statuses(:"auto-version")
+    assert_xml_matches(response[:"auto-version"]) do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :"locked-checkout"
+    end
+
+    delete_coll 'testcol'
+  end
+
+  def test_copy_on_collection_containing_checked_in_vcr
+    new_coll 'dstcol'
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+    av_val = ::Builder::XmlMarkup.new
+    av_val.lb(:"version-control", "xmlns:lb" => "http://limebits.com/ns/1.0/")
+
+    @request.proppatch('dstcol', {lb_av_new_children_propkey => av_val})
+    
+    new_file 'dstcol/file', @stream
+
+    new_coll 'srccol'
+    new_file('srccol/file', StringIO.new("srcfile"))
+    new_file('srccol/file2', StringIO.new("srcfile2"))
+
+    response = @request.copy 'srccol', 'dstcol', RubyDav::INFINITY, true
+    assert_equal '207', response.status
+    dstfile_err_resp = response.responses.find {|resp| resp.url.match(/dstcol\/file$/) }
+    assert_equal '409', dstfile_err_resp.status
+
+    delete_coll 'srccol'
+    delete_coll 'dstcol'
+  end
+
+  def test_av_new_children_inherited_and_used_at_copy_destination_for_new_children_only
+    new_coll 'dstcol'
+    new_file('dstcol/file2', StringIO.new("dstcol/file2"))
+
+    lb_av_new_children_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'auto-version-new-children')
+    av_val = ::Builder::XmlMarkup.new
+    av_val.lb(:"version-control", "xmlns:lb" => "http://limebits.com/ns/1.0/")
+
+    @request.proppatch('dstcol', {lb_av_new_children_propkey => av_val})
+
+    new_coll 'srccol'
+    new_file('srccol/file', StringIO.new("srccol/file"))
+    new_file('srccol/file2', StringIO.new("srccol/file2"))
+    new_coll 'srccol/subcol'
+    new_file('srccol/subcol/file', StringIO.new("srccol/subcol/file"))
+
+    response = @request.copy 'srccol', 'dstcol', RubyDav::INFINITY, true
+    assert_equal '204', response.status
+
+    check_postcond_dav_put_under_version_control('dstcol/file')
+    check_postcond_dav_put_under_version_control('dstcol/subcol/file')
+
+    error_raised = false
+    begin
+      check_postcond_dav_put_under_version_control('dstcol/file2')
+    rescue
+      error_raised = true
+    ensure
+      assert error_raised
+    end
+      
+    response = @request.propfind('dstcol/subcol', 0, lb_av_new_children_propkey)
+    assert_equal '207', response.status
+    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+
+    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+      xml.xmlns! :lb => "http://limebits.com/ns/1.0/"
+      xml.lb :"version-control"
+    end
+
+  end
+
 end
