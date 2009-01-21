@@ -24,7 +24,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'cartman'
   end
 
-  def _test_create_user_requires_displayname
+  def test_create_user_requires_displayname
     response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :email => 'cartman@example.com'})
     assert response.error?
 
