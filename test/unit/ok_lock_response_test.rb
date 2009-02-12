@@ -2,7 +2,7 @@ require 'rexml/document'
 
 require 'test/unit/unit_test_helper'
 
-class OkLocalResponseTest < RubyDavUnitTestCase
+class OkLockResponseTest < RubyDavUnitTestCase
   def test_create
     response = RubyDav::OkLockResponse.create '/foo', '200', {}, @lockdiscovery, :lock
     assert_instance_of RubyDav::LockInfo, response.lockinfo
