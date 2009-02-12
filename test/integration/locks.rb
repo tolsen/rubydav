@@ -16,11 +16,24 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '201', response.status
 
     # get an exclusive write lock
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
+    owner = "<D:href xmlns:D='DAV:'>http://tim.limebits.com/</D:href>"
+    lockinfo = RubyDav::LockInfo.new(:depth => 0, :owner => owner)
     response = @request.lock('file', lockinfo)
     assert_equal '200', response.status
     lockinfo = response.lockinfo
 
+    assert_equal :write, lockinfo.type
+    assert_equal :exclusive, lockinfo.scope
+    assert_equal 0, lockinfo.depth
+
+    assert_xml_matches lockinfo.owner do |xml|
+      xml.xmlns! :D => "DAV:"
+      xml.D :href, 'http://tim.limebits.com/'
+    end
+    # not checking timeout as that is server dependent
+    # supposedly, so is the locktoken (it may not even have to be
+    # returned according to the spec?!)
+    
     # assert that it can't be deleted while still locked
     response = @request.delete('file')
     assert_equal '423', response.status
@@ -628,18 +641,6 @@ class WebDavLocksTest < Test::Unit::TestCase
     delete_coll 'httplock'
   end
    
-  def setup_hr    
-    new_coll 'httplock'
-    new_coll 'httplock/hr'
-    new_coll 'httplock/hr/recruiting'
-    new_coll 'httplock/hr/recruiting/resumes'
-    new_coll 'httplock/hr/archives'
-
-    new_file 'httplock/hr/recruiting/resumes/tom', StringIO.new('genius')
-    new_file 'httplock/hr/recruiting/resumes/dick', StringIO.new('one of a kind')
-    new_file 'httplock/hr/recruiting/resumes/harry', StringIO.new('moron')
-  end
-
   def assert_hr_move_response exp_response, if_hdr=nil
     opts = {}
     opts = { :if => if_hdr } unless if_hdr.nil?
@@ -661,4 +662,17 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.get(uri)
     response.headers['etag'][0]
   end
+
+  def setup_hr    
+    new_coll 'httplock'
+    new_coll 'httplock/hr'
+    new_coll 'httplock/hr/recruiting'
+    new_coll 'httplock/hr/recruiting/resumes'
+    new_coll 'httplock/hr/archives'
+
+    new_file 'httplock/hr/recruiting/resumes/tom', StringIO.new('genius')
+    new_file 'httplock/hr/recruiting/resumes/dick', StringIO.new('one of a kind')
+    new_file 'httplock/hr/recruiting/resumes/harry', StringIO.new('moron')
+  end
+
 end

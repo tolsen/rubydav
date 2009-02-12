@@ -1,9 +1,9 @@
 require File.dirname(__FILE__) + '/acl'
-require File.dirname(__FILE__) + '/lock'
-require File.dirname(__FILE__) + '/rexml_fixes'
-require File.dirname(__FILE__) + '/errors'
-require File.dirname(__FILE__) + '/utility'
 require File.dirname(__FILE__) + '/dav_error'
+require File.dirname(__FILE__) + '/errors'
+require File.dirname(__FILE__) + '/lock_info'
+require File.dirname(__FILE__) + '/rexml_fixes'
+require File.dirname(__FILE__) + '/utility'
 
 module RubyDav
 
@@ -167,44 +167,23 @@ module RubyDav
     # locktoken
     attr_reader :lockinfo
 
-    def self.parse_timeout(timeout)
-      timeout = timeout.text
-      timeout.split('-')[1] if timeout =~ /Second-/
-      INFINITY if timeout =~ /Infinite/
+    class << self
+      
+      def create(url, status, headers, body, method)
+        lockinfo = parse_body(body)
+        lockinfo.root = url
+        self.new(url, status, headers, body, lockinfo)
+      end
+
+      def parse_body(body)
+        root = REXML::Document.new(body).root
+        return RubyDav::LockInfo.from_prop_element root
+      rescue ArgumentError
+        raise BadResponseError
+      end
+
     end
-
-    def self.parse_locktoken(locktoken)
-      lthref = REXML::XPath.first(locktoken, "D:href", {"D" => "DAV:"})
-      lthref.text
-    end
-
-    def self.parse_body(body)
-      root = REXML::Document.new(body).root
-      raise BadResponseError unless (root.namespace == "DAV:" && root.name == "prop")
-      lockdiscovery = REXML::XPath.first(root, "D:lockdiscovery", {"D" => "DAV:"})
-      activelock = REXML::XPath.first(lockdiscovery, "D:activelock", {"D" => "DAV:"})
-
-      locktype = REXML::XPath.first(activelock, "D:locktype", {"D" => "DAV:"})
-      lockscope = REXML::XPath.first(activelock, "D:lockscope", {"D" => "DAV:"})
-      depth = REXML::XPath.first(activelock, "D:depth", {"D" => "DAV:"})
-      owner = REXML::XPath.first(activelock, "D:owner", {"D" => "DAV:"})
-      timeout = REXML::XPath.first(activelock, "D:timeout", {"D" => "DAV:"})
-      locktoken = REXML::XPath.first(activelock, "D:locktoken", {"D" => "DAV:"})
-
-      RubyDav::LockInfo.new(:type => :"#{locktype.elements.to_s}",
-                            :scope => :"#{locktype.elements.to_s}",
-                            :depth => depth.text,
-                            :owner => owner.text,
-                            :timeout => parse_timeout(timeout),
-                            :token => parse_locktoken(locktoken)
-                            )
-    end
-
-    def self.create(url, status, headers, body, method)
-      lockinfo = parse_body(body)
-      lockinfo.root = url
-      self.new(url, status, headers, body, lockinfo)
-    end
+    
 
     private
     def initialize(url, status, headers, body, lockinfo)
@@ -436,6 +415,9 @@ module RubyDav
       super(url, status, headers, body, nil)
       @unauthorized = @propertystatushash.values.include? '401'
     end
+
+#    def lockdiscovery
+      
 
     private
     def self.parse_propstats response
