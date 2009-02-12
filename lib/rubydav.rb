@@ -25,6 +25,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/http_fixes'
   require File.dirname(__FILE__) + '/rubydav/file_fixes'
   require File.dirname(__FILE__) + '/rubydav/if_header'
+  require File.dirname(__FILE__) + '/rubydav/property_result'
 
   require 'stringio'
 
