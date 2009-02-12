@@ -213,12 +213,11 @@ module RubyDav
 
   # client error response class, 4xx series
   class ClientErrorResponse < ErrorResponse
-    include DavErrorHandler
     attr_reader :dav_error, :body
 
     def self.create(url, status, headers, body, method)
         root = REXML::Document.new(body).root
-        dav_error = DavErrorHandler.parse_dav_error(root)
+        dav_error = DavError.parse_dav_error(root)
         self.new(url, status, headers, body, dav_error)
     end
 
@@ -335,12 +334,11 @@ module RubyDav
   # on the resource because the server is unable to store the representation
   # needed to successfully complete the request.
   class InsufficientStorageError < ServerErrorResponse
-    include DavErrorHandler
     attr_reader :dav_error
 
     def self.create(url, status, headers, body, method)
         root = REXML::Document.new(body).root
-        dav_error = DavErrorHandler.parse_dav_error(root)
+        dav_error = DavError.parse_dav_error(root)
         self.new(url, status, headers, body, dav_error)
     end
 
@@ -370,7 +368,6 @@ module RubyDav
   # For mulistatus responses that return individual DAV:response elements with
   # DAV:propstat elements
   class PropstatResponse < MultiStatusResponse
-    include DavErrorHandler
     attr_reader :propertyhash
     attr_reader :propertystatushash
     attr_reader :propertyerrorhash
@@ -426,7 +423,7 @@ module RubyDav
         status_elem = REXML::XPath.first(propstat, "D:status", {"D" => "DAV:"})
         status = RubyDav.parse_status(status_elem.text)
         dav_error_elem = REXML::XPath.first(propstat, "D:error", {"D" => "DAV:"})
-        dav_error = DavErrorHandler.parse_dav_error(dav_error_elem)
+        dav_error = DavError.parse_dav_error(dav_error_elem)
         props =  parse_prop(REXML::XPath.first(propstat, "D:prop", {"D" => "DAV:"}))
         yield(status, dav_error, props)
       end
