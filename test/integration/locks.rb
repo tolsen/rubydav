@@ -377,7 +377,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.lock(col, lockinfo)
     assert_equal '200', response.status
     lockinfo = response.lockinfo
-    assert_equal "0", lockinfo.depth
+    assert_equal 0, lockinfo.depth
 
     response = @request.put(col_file, StringIO.new("Should succeed"))
     assert_equal '204', response.status
