@@ -234,4 +234,85 @@ class WebDavPropsTest < Test::Unit::TestCase
     # cleanup
     delete_file 'testfile'
   end
+
+  def test_dead_properties_of_child_collections_are_retained_on_move
+    new_coll 'a'
+    new_coll 'a/b'
+    new_coll 'a/b/c'
+
+    author_pkey = RubyDav::PropKey.get('http://example.org/mynamespace', 'author')
+    publisher_pkey = RubyDav::PropKey.get('http://example.org/mynamespace', 'publisher')
+
+    # add a property to the source
+    response = @request.proppatch('a/b/c', {author_pkey => 'myname'})
+    assert response.propertyhash[author_pkey]
+
+    # move to destination
+    response = @request.move('a', 'd')
+    assert_equal '201', response.status
+
+    # check that author is correct on the destination
+    response = @request.propfind('d/b/c', 0, :allprop)
+    assert_equal 'myname', response.propertyhash[author_pkey].strip
+
+    # change the property values on the destination
+    response = @request.proppatch('d/b/c', { author_pkey => 'dummyname', publisher_pkey => 'dummy'})
+    assert response.propertyhash[author_pkey]
+    assert response.propertyhash[publisher_pkey]
+
+    # let's do it again. this time we'll overwrite
+    ['a', 'a/b', 'a/b/c'].each { |url| assert_equal '201', @request.mkcol(url).status }
+
+    # add a property to the source
+    response = @request.proppatch('a/b/c', {author_pkey => 'newname'})
+    assert response.propertyhash[author_pkey]
+
+    # move to destination
+    response = @request.move('a', 'd')
+    assert_equal '204', response.status
+
+    # make sure the props are right
+    response = @request.propfind('d/b/c', 0, :allprop)
+    assert_equal 'newname',  response.propertyhash[author_pkey].strip
+    assert_nil response.propertyhash[publisher_pkey]
+
+    delete_coll 'd'
+  end
+
+  def test_dead_properties_of_child_collections_are_copied_over_correctly_on_copy
+    new_coll 'a'
+    new_coll 'a/b'
+    new_coll 'a/b/c'
+
+    author_pkey = RubyDav::PropKey.get('http://example.org/mynamespace', 'author')
+    publisher_pkey = RubyDav::PropKey.get('http://example.org/mynamespace', 'publisher')
+
+    response = @request.proppatch('a/b/c', { author_pkey => 'myname'})
+    assert_equal '207',response.status
+    assert response.propertyhash[author_pkey]
+    
+    response = @request.copy('a', 'd')
+    assert_equal '201', response.status
+
+    # check that the property was copied over correctly
+    response = @request.propfind('d/b/c', 0, :allprop)
+    assert_equal 'myname', response.propertyhash[author_pkey].strip
+
+    # change the property value on the destination
+    response = @request.proppatch('d/b/c', { author_pkey => 'dummyname', publisher_pkey => 'dummy'})
+    assert response.propertyhash[author_pkey]
+    assert response.propertyhash[publisher_pkey]
+
+    # copy over again, this time it'll overwrite
+    response = @request.copy('a', 'd')
+    assert_equal '204', response.status
+
+    # test that the destination has the new property values
+    response = @request.propfind('d/b/c', 0, :allprop)
+    assert_equal 'myname', response.propertyhash[author_pkey].strip
+    assert_nil response.propertyhash[publisher_pkey]
+
+    delete_coll 'a'
+    delete_coll 'd'
+  end
 end
