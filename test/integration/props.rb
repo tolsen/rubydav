@@ -235,6 +235,17 @@ class WebDavPropsTest < Test::Unit::TestCase
     delete_file 'testfile'
   end
 
+  def test_displayname
+    new_file 'testfile', StringIO.new("test")
+    
+    response = @request.propfind('testfile', 0, :displayname)
+    assert_equal '207', response.status
+    assert_equal '', response[:displayname]
+
+    # cleanup
+    delete_file 'testfile'
+  end
+
   def test_dead_properties_of_child_collections_are_retained_on_move
     new_coll 'a'
     new_coll 'a/b'
