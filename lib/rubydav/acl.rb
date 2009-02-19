@@ -1,6 +1,7 @@
 require 'set'
 
 require File.dirname(__FILE__) + '/prop_key'
+require File.dirname(__FILE__) + '/utility'
 
 module RubyDav
   
@@ -90,6 +91,50 @@ module RubyDav
       ' Protected: ' + (@isprotected ? 'T':'F') + ' Privileges: ' +
       @privileges.inject(' ') {|privs, p| privs += p.to_s}
     end
+
+    class << self
+
+      def from_elem elem
+        protected = !RubyDav::xpath_first(elem, 'protected').nil?
+        inherited_url =
+          RubyDav::xpath_first elem, 'inherited/href/text()'
+
+        principal_elem = RubyDav::xpath_first elem, 'principal'
+        raise 'no principal element found' if principal_elem.nil?
+        principal = parse_principal_element principal_elem
+
+        action_elem = RubyDav::xpath_first elem, 'grant|deny'
+        raise 'no grant or deny element found' if action_elem.nil?
+        action = action_elem.name.to_sym
+
+        privileges =
+          RubyDav::xpath_match(action_elem, 'privilege/*').map do |e|
+          PropKey.get e.namespace, e.name
+        end
+
+        if inherited_url.nil?
+          return Ace.new(action, principal, protected, *privileges)
+        else
+          return InheritedAce.new(inherited_url.to_s, action, principal,
+                                  protected, *privileges)
+        end
+      end
+
+      def parse_principal_element principal_elem
+        if (href = RubyDav::xpath_first principal_elem, 'href/text()')
+          return href.to_s
+        elsif (property = RubyDav::xpath_first principal_elem, 'property/*')
+          return PropKey.get(property.namespace, property.name)
+        else
+          %w(all authenticated unauthenticated self).each do |name|
+            property = RubyDav::xpath_first principal_elem, name
+            return name.to_sym unless property.nil?
+          end
+
+          raise "invalid principal element: #{principal_elem.to_s}"
+        end
+      end
+    end
   end
   
   # An inherited ace is inherited from another resource.
@@ -165,6 +210,15 @@ module RubyDav
       (self.class == other.class) &&
         super(other)
     end
-    alias eq? == 
+    alias :eq? :==
+
+    class << self
+      
+      def from_elem elem
+        Acl[*RubyDav::xpath_match(elem, 'ace').map { |e| Ace.from_elem e }]
+      end
+      
+    end
+    
   end
 end

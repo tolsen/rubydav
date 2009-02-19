@@ -1,3 +1,4 @@
+require 'lib/rubydav/response.rb'
 
 module RubyDav
 
@@ -51,7 +52,7 @@ module RubyDav
         urlhash[href] ||= {}
         self.parse_propstats(response) do |status, dav_error, props|
           props.each do |pk, element|
-            urlhash[pk] = PropertyResult.new pk, status, element, dav_error
+            urlhash[href][pk] = PropertyResult.new pk, status, element, dav_error
           end
         end
       end

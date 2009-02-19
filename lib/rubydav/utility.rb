@@ -1,5 +1,7 @@
-require File.dirname(__FILE__) + '/errors'
+require 'rexml/document'
 require 'uri'
+
+require File.dirname(__FILE__) + '/errors'
 
 module RubyDav
 
@@ -45,6 +47,17 @@ module RubyDav
       return output
     end
 
+    # does REXML::XPath.first but with default namespace set to DAV:
+    def xpath_first elem, path, namespaces = {}
+      namespaces = { '' => 'DAV:' }.merge namespaces
+      return REXML::XPath.first elem, path, namespaces
+    end
+
+    # does REXML::XPath.match but with default namespace set to DAV:
+    def xpath_match elem, path, namespaces = {}
+      namespaces = { '' => 'DAV:' }.merge namespaces
+      return REXML::XPath.match elem, path, namespaces
+    end
   end
 
 end

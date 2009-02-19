@@ -3,6 +3,8 @@ module RubyDav
   # Property keys
   class PropKey
 
+    include Comparable
+
     #--
     # List of all supported DAV: properties.
     # DAV_PROPERTIES = %w{getcontentlength   getcontenttype   creationdate
@@ -19,22 +21,23 @@ module RubyDav
     # Returns a PropKey  (Flyweight Pattern)
     def self.get ns, name
       name = name.to_s if name.is_a?(Symbol)
-      @@keys[ns + name] = new(ns, name) if @@keys[ns + name].nil?
-      @@keys[ns + name]
+      raise "'}' not allowed in property name" if name['}']
+
+      key4key = ns_and_name_str(ns, name).to_sym
+      return (@@keys[key4key] ||= new(ns, name))
+    end
+
+    def self.ns_and_name_str ns, name
+      "{#{ns}}#{name}"
     end
     
     # returns PropKey given PropKey or Symbol
     def self.strictly_prop_key propkey_or_symbol
-      if propkey_or_symbol.is_a?(Symbol)
-        if(@@registeredkeys[propkey_or_symbol])
-          propkey_or_symbol = @@registeredkeys[propkey_or_symbol]
-        else
-          propkey_or_symbol = self.get("DAV:",propkey_or_symbol.to_s)
-        end
-      end
-      propkey_or_symbol
+      return propkey_or_symbol unless propkey_or_symbol.is_a?(Symbol)
+      return @@registeredkeys[propkey_or_symbol] if
+        @@registeredkeys.include? propkey_or_symbol
+      return self.get "DAV:", propkey_or_symbol
     end
-    
     
     # registers a PropKey to have alias <tt>symbol</tt>
     def register_symbol symbol
@@ -42,16 +45,22 @@ module RubyDav
     end
     
     def to_s
-      "#{@ns}#{@name}"
+      self.class.ns_and_name_str ns, name
     end
- 
-    #FIXME: Registered Symbols cannot be sent to == as of now
-    def == other
-   #   other = PropKey.strictly_prop_key(other) if Symbol === other 	
-      return false unless PropKey === other
-      @ns == other.ns && @name == other.name
+
+    def to_sym
+      return name.to_sym if dav?
+      
+      return @@registeredkeys.keys.detect do |sym|
+        @@registeredkeys[sym] == self
+      end
     end
-    alias eql? ==
+
+    def <=> other
+      return 1 unless other.is_a?(PropKey)
+      return @name <=> other.name if @ns == other.ns
+      return @ns <=> other.ns
+    end
       
     def dav?
       @ns == "DAV:"
@@ -84,9 +93,7 @@ module RubyDav
     end
     
     def hash
-      hashval = "{#{@ns}}#{@name}".hash
-      hashval = "#{@ns}#{@name}".hash if @ns == "DAV:"
-      hashval
+      to_s.hash
     end
     
     def initialize(ns, name)

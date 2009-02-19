@@ -1,8 +1,25 @@
+require File.dirname(__FILE__) + '/acl'
+require File.dirname(__FILE__) + '/current_user_privilege_set'
+require File.dirname(__FILE__) + '/prop_key'
+
+
 module RubyDav
 
   class PropertyResult
 
     attr_reader :prop_key, :status, :element, :error
+
+    def acl
+      return nil if prop_key != PropKey.get('DAV:', 'acl')
+      return Acl.from_elem(element)
+    end
+
+    def current_user_privilege_set
+      return nil if prop_key != PropKey.get('DAV:', 'current-user-privilege-set')
+      return CurrentUserPrivilegeSet.from_elem(element)
+    end
+
+    alias cups current_user_privilege_set
 
     def initialize prop_key, status, element = nil, error = nil
       @prop_key = prop_key
@@ -17,6 +34,11 @@ module RubyDav
 
     def success?
       status == '200'
+    end
+
+    def supported_privilege_set
+      return nil if prop_key != PropKey.get('DAV:', 'supported-privilege-set')
+      return SupportedPrivilegeSet.from_elem(element)
     end
 
     def value

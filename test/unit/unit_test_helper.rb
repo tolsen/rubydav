@@ -128,6 +128,117 @@ EOS
     </D:lockdiscovery> 
   </D:prop> 
 EOS
+
+    acl_str = <<EOS
+<D:acl xmlns:D='DAV:'> 
+  <D:ace> 
+    <D:principal> 
+      <D:href
+      >http://www.example.com/acl/groups/maintainers</D:href> 
+    </D:principal>  
+    <D:grant> 
+      <D:privilege><D:write/></D:privilege> 
+    </D:grant> 
+  </D:ace> 
+  <D:ace> 
+    <D:principal> 
+      <D:all/> 
+    </D:principal> 
+    <D:grant> 
+      <D:privilege><D:read/></D:privilege>  
+    </D:grant> 
+  </D:ace> 
+</D:acl> 
+EOS
+
+    @acl_elem = REXML::Document.new(acl_str).root
+
+    cups_str = <<EOS
+<current-user-privilege-set xmlns='DAV:'> 
+  <privilege><read/></privilege> 
+  <privilege><write/></privilege> 
+</current-user-privilege-set>
+EOS
+    @cups_elem = REXML::Document.new(cups_str).root
+
+    supported_privilege_set_str = <<EOS
+<D:supported-privilege-set xmlns:D='DAV:'>
+  <D:supported-privilege>
+    <D:privilege><D:all/></D:privilege>
+   <D:abstract/>
+    <D:description xml:lang="en">
+      Any operation
+    </D:description>
+    <D:supported-privilege>
+      <D:privilege><D:read/></D:privilege>
+      <D:description xml:lang="en">
+        Read any object
+      </D:description>
+      <D:supported-privilege>
+        <D:privilege><D:read-acl/></D:privilege>
+        <D:abstract/>
+        <D:description xml:lang="en">Read ACL</D:description>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege> 
+          <D:read-current-user-privilege-set/>
+        </D:privilege>
+        <D:abstract/>
+        <D:description xml:lang="en">
+          Read current user privilege set property
+        </D:description>
+      </D:supported-privilege>
+    </D:supported-privilege>
+    <D:supported-privilege>
+      <D:privilege><D:write/></D:privilege>
+      <D:description xml:lang="en">
+        Write any object
+      </D:description>
+      <D:supported-privilege>
+        <D:privilege><D:write-acl/></D:privilege>
+        <D:description xml:lang="en">
+          Write ACL
+        </D:description>
+        <D:abstract/>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege><D:write-properties/></D:privilege>
+        <D:description xml:lang="en">
+          Write properties
+        </D:description>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege><D:write-content/></D:privilege>
+        <D:description xml:lang="en">
+          Write resource content
+        </D:description>
+      </D:supported-privilege>
+    </D:supported-privilege>
+    <D:supported-privilege>
+      <D:privilege><D:unlock/></D:privilege>
+      <D:description xml:lang="en">
+        Unlock resource
+      </D:description>
+    </D:supported-privilege>
+  </D:supported-privilege>
+</D:supported-privilege-set>
+EOS
+
+    @supported_privilege_set_elem =
+      REXML::Document.new(supported_privilege_set_str).root
+    @supported_privilege_elem =
+      RubyDav::xpath_first @supported_privilege_set_elem, 'supported-privilege'
+
+    @all_priv = RubyDav::PropKey.get 'DAV:', 'all'
+    @read_priv = RubyDav::PropKey.get 'DAV:', 'read'
+    @read_cups_priv =
+      RubyDav::PropKey.get 'DAV:', 'read-current-user-privilege-set'
+    @read_acl_priv = RubyDav::PropKey.get 'DAV:', 'read-acl'
+    @write_priv = RubyDav::PropKey.get 'DAV:', 'write'
+    @write_acl_priv = RubyDav::PropKey.get 'DAV:', 'write-acl'
+    @write_content_priv = RubyDav::PropKey.get 'DAV:', 'write-content'
+    @write_properties_priv = RubyDav::PropKey.get 'DAV:', 'write-properties'
+    @unlock_priv = RubyDav::PropKey.get 'DAV:', 'unlock'
   end
   
 end

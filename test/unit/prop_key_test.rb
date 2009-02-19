@@ -1,10 +1,32 @@
 require 'test/unit/unit_test_helper'
 
 class RubyDavPropKeyTest < RubyDavUnitTestCase
+
+  def test_compare
+    pk1 = RubyDav::PropKey.get 'ns_a', 'name1'
+    pk2 = RubyDav::PropKey.get 'ns_b', 'name2'
+    pk3 = RubyDav::PropKey.get 'ns_b', 'name3'
+    pk4 = RubyDav::PropKey.get 'ns_c', 'name0'
+
+    assert pk1 < pk2
+    assert pk2 < pk3
+    assert pk3 < pk4
+    assert pk1 < pk4
+  end
   
   def test_get
     propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace","myprop"
-    assert_not_nil propkey
+    assert_instance_of RubyDav::PropKey, propkey
+  end
+
+  def test_get__fails_when_name_has_right_brace
+    assert_raises(RuntimeError) { RubyDav::PropKey.get 'ns', 'foo}bar' }
+  end
+
+  def test_get_gives_different_objects
+    propkey1 = RubyDav::PropKey.get "namespace", "name"
+    propkey2 = RubyDav::PropKey.get "namespacen", "ame"
+    assert_not_equal propkey1, propkey2
   end
   
   def test_get_gives_same_object
@@ -59,7 +81,7 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   
   def test_to_s
     propkey = RubyDav::PropKey.get "DAV:", "myprop"
-    assert_equal "DAV:myprop", propkey.to_s
+    assert_equal "{DAV:}myprop", propkey.to_s
   end
   
   def test_equality
@@ -74,7 +96,7 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   def test_dav?
     propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
-    
+
     assert !propkey2.dav?
     assert propkey1.dav?
   end
@@ -82,17 +104,16 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   def test_hash
     propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "DAV:", "myprop"
-    
-    assert propkey1.hash == propkey2.hash
-    
+
+    assert_equal propkey1.hash, propkey2.hash
+
     propkey3 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
     propkey4 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
-    
-    assert propkey3.hash == propkey4.hash
-    
-    assert propkey1.hash != propkey4.hash
+
+    assert_equal propkey3.hash, propkey4.hash
+    assert_not_equal propkey1.hash, propkey4.hash
   end
-  
+
   def generate_and_assert_propkey_xml propkey, expected_xml
     assert (normalized_rexml_equal expected_xml, propkey.printXML)
   end

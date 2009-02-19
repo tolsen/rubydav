@@ -2,9 +2,10 @@ require 'rexml/document'
 
 require 'test/unit/unit_test_helper'
 
-class PropertyResultTestCase < Test::Unit::TestCase
+class PropertyResultTestCase < RubyDavUnitTestCase
 
   def setup
+    super
     displayname_str = "<D:displayname xmlns:D='DAV:'>Bob</D:displayname>"
     displayname_element = REXML::Document.new(displayname_str).root
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
@@ -12,6 +13,29 @@ class PropertyResultTestCase < Test::Unit::TestCase
       RubyDav::PropertyResult.new @displayname_pk, '200', displayname_element
 
     @error_result = RubyDav::PropertyResult.new @displayname_pk, '404', nil, :error
+
+    @acl_pk = RubyDav::PropKey.get 'DAV:', 'acl'
+  end
+
+  def test_acl
+    @acl_result = RubyDav::PropertyResult.new @acl_pk, '200', @acl_elem
+    assert_instance_of RubyDav::Acl, @acl_result.acl
+  end
+
+  def test_acl__not_an_acl
+    assert_nil @result.acl
+  end
+
+  def test_current_user_privilege_set
+    cups_pk = RubyDav::PropKey.get 'DAV:', 'current-user-privilege-set'
+    cups_result = RubyDav::PropertyResult.new cups_pk, '200', @cups_elem
+    assert_instance_of(RubyDav::CurrentUserPrivilegeSet,
+                       cups_result.current_user_privilege_set)
+    assert_instance_of RubyDav::CurrentUserPrivilegeSet, cups_result.cups
+  end
+
+  def test_current_user_privilege_set__not_cups
+    assert_nil @result.current_user_privilege_set
   end
 
   def test_initialize
@@ -37,6 +61,18 @@ class PropertyResultTestCase < Test::Unit::TestCase
   def test_success
     assert @result.success?
     assert !@error_result.success?
+  end
+
+  def test_supported_privilege_set
+    sps_pk = RubyDav::PropKey.get 'DAV:', 'supported-privilege-set'
+    sps_result = RubyDav::PropertyResult.new(sps_pk, '200',
+                                             @supported_privilege_set_elem)
+    assert_instance_of(RubyDav::SupportedPrivilegeSet,
+                       sps_result.supported_privilege_set)
+  end
+  
+  def test_supported_privilege_set__not_an_sps
+    assert_nil @result.supported_privilege_set
   end
 
   def test_value 

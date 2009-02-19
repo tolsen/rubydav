@@ -16,16 +16,18 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
   $:.unshift File.join(File.dirname(__FILE__), '../../better_httpauth/lib')
 
-  require File.dirname(__FILE__) + '/rubydav/response'
-  require File.dirname(__FILE__) + '/rubydav/webdav'
-  require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
   require File.dirname(__FILE__) + '/rubydav/auth'
   require File.dirname(__FILE__) + '/rubydav/auth_world'
   require File.dirname(__FILE__) + '/rubydav/connection_pool'
-  require File.dirname(__FILE__) + '/rubydav/http_fixes'
+  require File.dirname(__FILE__) + '/rubydav/current_user_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/file_fixes'
+  require File.dirname(__FILE__) + '/rubydav/http_fixes'
   require File.dirname(__FILE__) + '/rubydav/if_header'
   require File.dirname(__FILE__) + '/rubydav/property_result'
+  require File.dirname(__FILE__) + '/rubydav/response'
+  require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
+  require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
+  require File.dirname(__FILE__) + '/rubydav/webdav'
 
   require 'stringio'
 
