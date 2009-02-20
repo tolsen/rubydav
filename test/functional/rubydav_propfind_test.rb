@@ -9,7 +9,6 @@ class RubyDavPropfindTest < RubyDavFunctionalTestCase
   end
   
   def test_propfind_multistatus_depth_0
-
     responsehash = {}
     responsehash["/limespot/myhome"] = []
     responsehash["/limespot/myhome"] << ["200", nil, [["creationdate","DAV:","1997-12-01T18:27:21-08:00"], ["prop1","DAV:","val1"]]]
@@ -20,11 +19,12 @@ class RubyDavPropfindTest < RubyDavFunctionalTestCase
     pk1 = RubyDav::PropKey.get("DAV:","creationdate")
     pk2 = RubyDav::PropKey.get("DAV:","prop1")
     pk3 = RubyDav::PropKey.get("http://www.foo.bar/boxschema/","bigbox")
-    propstathash = {pk1 => "200",pk2 => "200",pk3 => "403"}
-    prophash = {pk1 => "1997-12-01T18:27:21-08:00",pk2 => "val1"}
+    statuses = {'/limespot/myhome' => {pk1 => "200",pk2 => "200",pk3 => "403"} }
+    properties = { '/limespot/myhome' => {pk1 => "1997-12-01T18:27:21-08:00",pk2 => "val1"} }
     
     response = get_response_to_mock_propfind_request("207",body)
-    assert_propmultiresponse_object(response,prophash,propstathash,0)
+
+    assert_propstat_response response, properties, statuses
   end
   
   def test_propfind_multistatus_depth_infinity
@@ -39,18 +39,13 @@ class RubyDavPropfindTest < RubyDavFunctionalTestCase
     pk = RubyDav::PropKey.get("DAV:","prop1")
     prophash = {pk => "val1"}
     propstathash = {pk => "200"}
-    
+
+    properties = urls.inject({}) { |h, u| h[u] = prophash; h }
+    statuses = urls.inject({}) { |h, u| h[u] = propstathash; h }
+
     response = get_response_to_mock_propfind_request("207", body)
-    assert_propmultiresponse_object(response, prophash, propstathash, 2)
-
-    response1 = response.children["a"]
-    assert_propmultiresponse_object(response1, prophash, propstathash, 0)
-
-    response2 = response.children["b"]
-    assert_propmultiresponse_object(response2, prophash, propstathash, 1)
-
-    response3 = response2.children["c"]
-    assert_propmultiresponse_object(response3, prophash, propstathash, 0)
+    
+    assert_propstat_response response, properties, statuses
   end
     
   create_propfind_tests "400", "401", "403", "404", "500"

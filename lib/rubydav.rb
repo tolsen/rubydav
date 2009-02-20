@@ -408,57 +408,6 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #   response[:displayname]
   #   response[:Propkey.get('http://example.org/mynamespace', 'tags')]
   #
-  # === Retrieving current user's privileges on a collection and its descendents
-  #
-  #   response = RubyDav.propfind_cups('http://www.example.org/user',
-  #                                    RubyDav::INFINITY,
-  #                                    :username => 'tim', :password => 'swordfish'})
-  #
-  # On success, PropfindCupsResponse with status 207 is returned
-  #
-  # To retrieve the privileges the current user has on /user (:read-acl, :read,
-  # :write):
-  #
-  #   response.privileges
-  #
-  # To access the PropfindCupsResponse for the child:
-  #
-  #   response2 = response.children['index.html']
-  #
-  # To retrieve the privileges the current user has on /user/index.html
-  # (:read-acl, :read, :write):
-  #
-  #   response2.privileges
-  #
-  # === Retrieving access control properties of a collection and its descendents
-  #
-  #   response = RubyDav.propfind_acl('http://www.example.org/user',
-  #                                   RubyDav::INFINITY,
-  #                                   :username => 'tim',
-  #                                   :password => 'swordfish'})
-  #
-  # On success, PropfindAclResponse with status 207 is returned.
-  #
-  # The returns the non-inherited and unprotected aces:
-  #
-  #   response.acl
-  #
-  # The immutable (non-inherited) aces on the collection:
-  #
-  #   response.protected_acl
-  #
-  # the aces inherited from other resources which can be both inherited and
-  # protected:
-  #
-  #   response.inherited_acl
-  #
-  # Access the PropfindAclResponse for the child:
-  #
-  #   response2 = response.children['index.html']
-  #
-  # An Acl is a list of Aces, an Ace defines the privileges a principal has on
-  # the resource.
-  #
   # === Setting access control properties of a collection
   #
   # acl command overwrites the access control list of a resource
@@ -539,24 +488,24 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :mkcol, url, nil, options
       end
 
-      def mkcol_ext(url, props, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
+#       def mkcol_ext(url, props, options={})
+#         requestbody = String.new
+#         xml ||= RubyDav::XmlBuilder.generate(requestbody)
 
-        xml.D(:mkcol, "xmlns:D" => "DAV:") do
-          xml.D(:set) do
-            xml.D(:prop) do
-              props.each do |propkey, value|
-                propkey =  PropKey.strictly_prop_key(propkey)
-                propkey.printXML xml, value
-              end
-            end
-          end
-        end
+#         xml.D(:mkcol, "xmlns:D" => "DAV:") do
+#           xml.D(:set) do
+#             xml.D(:prop) do
+#               props.each do |propkey, value|
+#                 propkey =  PropKey.strictly_prop_key(propkey)
+#                 propkey.printXML xml, value
+#               end
+#             end
+#           end
+#         end
 
-        bodystream = StringIO.new requestbody
-        request :mkcol_ext, url, bodystream, options
-      end
+#         bodystream = StringIO.new requestbody
+#         request :mkcol_ext, url, bodystream, options
+#       end
 
       # Creates a duplicate of the Source-URI at the Destination-URI.
       # If depth is infinity, copies collection and all its descendents.
@@ -737,32 +686,6 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :acl, url, bodystream, options
       end
 
-      # Query all the access-control properties of the Resource-URI and its
-      # descendents.
-      #
-      # Returns
-      # * PropfindAclResponse with all the aces for Request-URI and descendents
-      #   are accessible through children method
-      # * else appropriate error response
-      def propfind_acl(url, depth=INFINITY, options={})
-        options = options.merge :depth => depth
-        bodystream = generate_propfind_bodystream :acl
-        request :propfind_acl, url, bodystream, options
-      end
-
-      # Query all the privileges the current user has on the Request-URI and its
-      # descendents.
-      #
-      # Returns
-      # * PropfindCupsResponse with all the privileges, and descendents are
-      #   accessible through children method
-      # * else appropriate error response
-      def propfind_cups(url, depth=INFINITY, options={})
-        options = options.merge :depth => depth
-        bodystream = generate_propfind_bodystream :"current-user-privilege-set"
-        request :propfind_cups, url, bodystream, options
-      end
-      
       # Start versioning on the given url
       #
       # Returns
