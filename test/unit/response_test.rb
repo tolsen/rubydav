@@ -185,6 +185,27 @@ class PropstatResponseTest < Test::Unit::TestCase
     assert_equal element.to_s, result.element.to_s
   end
 
+  # expected is an array of 3-tuples: (status, dav_error, props)
+  def assert_propstats expected, parent_elem
+    expected_h = expected.inject({}) { |h, v| h[v[0]] = v; h }
+
+    propstat_infos =
+      RubyDav::PropstatResponse.send :parse_propstats, parent_elem
+    
+    assert_equal expected.size, propstat_infos.size
+
+    statuses = propstat_infos.map { |i| i.status }
+    assert_equal expected_h.keys.sort, statuses.sort
+
+    propstat_infos.each do |psi|
+      expected_tuple = expected_h[psi.status]
+      
+      assert_equal expected_tuple[1], psi.dav_error
+      assert_equal expected_tuple[2].sort, psi.props.sort
+    end
+  end
+  
+
   def get_prop response, status = 'HTTP/1.1 200 OK'
     REXML::XPath.first(response,
                        "propstat/status[.='#{status}']/../prop",
@@ -204,14 +225,6 @@ class PropstatResponseTest < Test::Unit::TestCase
     end
   end
   
-  def parse_propstats response
-    parsed_propstats = []
-    RubyDav::PropstatResponse.parse_propstats response do |status, error, props|
-      parsed_propstats.push [status, error, props]
-    end
-    return parsed_propstats
-  end
-
   def setup
     @propfind_response_str = <<EOS
   <?xml version="1.0" encoding="utf-8" ?>
@@ -371,7 +384,8 @@ EOS
   end
 
   def test_parse_body
-    urlhash = RubyDav::PropstatResponse.parse_body @propfind_response_str
+    urlhash =
+      RubyDav::PropstatResponse.send :parse_body, @propfind_response_str
     expected_urls = ['/container/', '/container/front.html'].sort
     assert_equal expected_urls, urlhash.keys.sort
 
@@ -386,7 +400,8 @@ EOS
   end
 
   def test_parse_body2
-    urlhash = RubyDav::PropstatResponse.parse_body @propfind2_response_str
+    urlhash =
+      RubyDav::PropstatResponse.send :parse_body, @propfind2_response_str
     assert_equal ['/container2/'], urlhash.keys
 
     container2_results = urlhash['/container2/']
@@ -404,25 +419,20 @@ EOS
   
   
   def test_parse_prop
-    prophash = RubyDav::PropstatResponse.parse_prop @container_prop
+    prophash = RubyDav::PropstatResponse.send :parse_prop, @container_prop
     assert_equal @expected_container_props, prophash
   end
 
   def test_parse_propstats
-    parsed_propstats = parse_propstats @container_response
     expected = [['200', nil, @expected_container_props]]
-    assert_equal expected, parsed_propstats
+    assert_propstats expected, @container_response
   end
 
   def test_parse_propstats2
-    expected = {
-      '200' => ['200', nil, @container2_200_props],
-      '401' => ['401', nil, @container2_401_props],
-      '403' => ['403', nil, @container2_403_props]}
-    
-    parsed_propstats = parse_propstats @container2_response
-    actual = parsed_propstats.inject({}) { |h, v| h[v[0]] = v; h }
-    assert_equal expected, actual
+    expected = [['200', nil, @container2_200_props],
+                ['401', nil, @container2_401_props],
+                ['403', nil, @container2_403_props]]
+    assert_propstats expected, @container2_response
   end
 
   def test_unauthorized
