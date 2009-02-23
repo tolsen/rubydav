@@ -369,6 +369,12 @@ module RubyDav
   class PropstatResponse < MultiStatusResponse
     
     attr_reader :resources
+
+    def error?
+      @error ||= @resources.values.any? do |properties|
+        properties.values.any? { |r| r.status !~ /^2\d\d$/ }
+      end
+    end
     
     def initialize(url, status, headers, body, resources)
       super(url, status, headers, body, nil)
@@ -386,8 +392,8 @@ module RubyDav
     class << self
 
       def create(url, status, headers, body, method)
-        resources = parse_body body
-        return self.new url, status, headers, body, resources
+        resources = parse_body body, url
+        return self.new(url, status, headers, body, resources)
       end
 
       private
@@ -415,7 +421,7 @@ module RubyDav
       end
 
       # returns hash of hashes: url -> PropKey -> PropertyResult
-      def parse_body(body)
+      def parse_body body, url
         root = REXML::Document.new(body).root
         raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
         return RubyDav.xpath_match(root, 'response').inject({}) do |h, r|
@@ -432,31 +438,21 @@ module RubyDav
 
   end
 
-#   class MkcolResponse < PropstatResponse
+  class MkcolResponse < PropstatResponse
 
-#     def self.create(url,status,headers,body,method)
-#       root = REXML::Document.new(body).root
-#       raise BadResponseError unless (root.namespace == "DAV:" && root.name == "mkcol-response")
-#       response = REXML::XPath.match(root, "D:mkcol-response", {"D" => "DAV:"})
+    class << self
 
-#       propertyhash = {}
-#       propertystatushash = {}
-#       propertyerrorhash = {}
-#       propertyfullhash = {}
-#       success = false
+      private
 
-#       self.parse_propstats(root) do |sub_status, dav_error, props|
+      def parse_body body, url
+        root = REXML::Document.new(body).root
+        raise BadResponseError unless
+          (root.namespace == "DAV:" && root.name == "mkcol-response")
 
-#         success = (sub_status == "200")
-#         props.each_key do |prop|
-#           propertystatushash[prop] = sub_status
-#           propertyerrorhash[prop] = dav_error
-#           propertyfullhash[prop] = propertyhash[prop] = true if success
-#         end
-#       end
-#       MkcolResponse.new(url, status, headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, !success)
-#     end
-#   end
+        return { url => parse_propstats(root) }
+      end
+    end
+  end
 
   # response to an unsuccessful lock request (RubyDav.lock)
   class LockMultiResponse < MultiStatusResponse #:nodoc:
@@ -477,7 +473,7 @@ module RubyDav
       ['200', :lock] => OkLockResponse,
       ['200', nil] => OkResponse,
       ['201', :lock] => OkLockResponse,
-#      ['201', :mkcol_ext] => MkcolResponse,
+      ['201', :mkcol_ext] => MkcolResponse,
       ['201', nil] => CreatedResponse,
       ['204', nil] => NoContentResponse,
       ['207', :copy] => MultiStatusResponse,
@@ -503,7 +499,7 @@ module RubyDav
       ['414', nil] => RequestUriTooLargeError,
       ['415', nil] => UnsupportedMediaTypeError,
       ['423', nil] => LockedError,
-#      ['424', :mkcol_ext] => MkcolResponse,
+      ['424', :mkcol_ext] => MkcolResponse,
       ['424', nil] => ErrorResponse,
       ['500', nil] => InternalServerError,
       ['503', nil] => ServiceUnavailableError,

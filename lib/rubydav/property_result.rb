@@ -25,7 +25,7 @@ module RubyDav
       other.instance_of?(PropertyResult) &&
         prop_key == other.prop_key &&
         status.to_sym == other.status.to_sym &&
-        element == other.element &&
+        value == other.value &&
         error == other.error
     end
 

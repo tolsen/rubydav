@@ -239,6 +239,9 @@ EOS
     @write_content_priv = RubyDav::PropKey.get 'DAV:', 'write-content'
     @write_properties_priv = RubyDav::PropKey.get 'DAV:', 'write-properties'
     @unlock_priv = RubyDav::PropKey.get 'DAV:', 'unlock'
+
+    @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
+    @resourcetype_pk = RubyDav::PropKey.get('DAV:', 'resourcetype')
   end
   
 end

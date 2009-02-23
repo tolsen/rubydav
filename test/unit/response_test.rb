@@ -136,46 +136,77 @@ class MultiStatusResponseTest < RubyDavUnitTestCase
   end
 end
 
-# class MkcolResponseTest < RubyDavUnitTestCase
-#   def setup
-#     @url = "http://www.example.org/othercontainer"
-#     @body = @@response_builder.construct_mkcol_response([["200", nil, [["resourcetype","DAV:",nil],["email","http://limebits.com/ns/1.0/",nil]]]])
-#     @fail_body = @@response_builder.construct_mkcol_response([["424", nil, [["resourcetype","DAV:",nil]]],["403", nil, [["email","http://limebits.com/ns/1.0/",nil]]]])
-#     @response = RubyDav::MkcolResponse.create(@url,"201",{},@body,:mkcol_ext)
-#     @bad_response = RubyDav::MkcolResponse.create(@url,"424",{},@fail_body,:mkcol_ext)
-#   end
-  
-#   def test_simple
-#     assert_instance_of RubyDav::MkcolResponse, @response
-#     assert_instance_of RubyDav::MkcolResponse, @bad_response
-#     assert_equal '201', @response.status
-#     assert @bad_response.error?
-#   end
-  
-#   def test_prophash
-#     prophash = {
-#       RubyDav::PropKey.get("DAV:","resourcetype") => true,
-#       RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => true
-#     }
-#     assert_equal prophash, @response.propertyhash
-#   end
-  
-#   def test_propertystatushash
-#     propstathash = { 
-#       RubyDav::PropKey.get("DAV:","resourcetype") => "200",
-#       RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => "200"
-#     }
-#     assert_equal propstathash, @response.propertystatushash
-#     propstathash = { 
-#       RubyDav::PropKey.get("DAV:","resourcetype") => "424",
-#       RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => "403"
-#     }
-#     assert_equal propstathash, @bad_response.propertystatushash
-#   end
-  
-# end
+class MkcolResponseTest < RubyDavUnitTestCase
+  def setup
+    super
+    @url = "http://www.example.org/othercontainer"
+    @body = @@response_builder.construct_mkcol_response([["200", nil, [["resourcetype","DAV:",nil],["email","http://limebits.com/ns/1.0/",nil]]]])
+    @fail_body = @@response_builder.construct_mkcol_response([["424", nil, [["resourcetype","DAV:",nil]]],["403", nil, [["email","http://limebits.com/ns/1.0/",nil]]]])
+    @response = RubyDav::MkcolResponse.create(@url,"201",{},@body,:mkcol_ext)
+    @bad_response = RubyDav::MkcolResponse.create(@url,"424",{},@fail_body,:mkcol_ext)
+  end
 
-class PropstatResponseTest < Test::Unit::TestCase
+  def test_parse_body
+    response_str = <<EOS
+<D:mkcol-response xmlns:D="DAV:">
+  <D:propstat>
+    <D:prop>
+      <D:resourcetype/>
+      <D:displayname/>
+    </D:prop>
+    <D:status>HTTP/1.1 200 OK</D:status>
+  </D:propstat>
+</D:mkcol-response> 
+EOS
+
+    root = REXML::Document.new(response_str).root
+    resourcetype_prop = RubyDav::xpath_first root, 'propstat/prop/resourcetype'
+    displayname_prop = RubyDav::xpath_first root, 'propstat/prop/displayname'
+    
+
+    expected = {
+      '/home/special' => {
+        @displayname_pk =>
+        RubyDav::PropertyResult.new(@displayname_pk, '200', displayname_prop),
+        @resourcetype_pk =>
+        RubyDav::PropertyResult.new(@resourcetype_pk, '200', resourcetype_prop)
+      }
+    }
+    
+    actual =
+      RubyDav::MkcolResponse.send :parse_body, response_str, '/home/special'
+
+    assert_equal expected, actual
+  end
+    
+  def test_parse_body__bad_root
+    response_str = <<EOS
+<D:foo-response xmlns:D="DAV:">
+  <D:propstat>
+    <D:prop>
+      <D:resourcetype/>
+      <D:displayname/>
+    </D:prop>
+    <D:status>HTTP/1.1 200 OK</D:status>
+  </D:propstat>
+</D:foo-response> 
+EOS
+
+    assert_raises RubyDav::BadResponseError do
+      RubyDav::MkcolResponse.send :parse_body, response_str, '/home/special'
+    end
+  end
+  
+  def test_simple
+    assert_instance_of RubyDav::MkcolResponse, @response
+    assert_instance_of RubyDav::MkcolResponse, @bad_response
+    assert_equal '201', @response.status
+    assert @bad_response.error?
+  end
+
+end
+
+class PropstatResponseTest < RubyDavUnitTestCase
 
   def assert_property_result prop, pk, result, status = '200', error = nil
     element = REXML::XPath.first prop, pk.name, '' => pk.ns
@@ -190,7 +221,7 @@ class PropstatResponseTest < Test::Unit::TestCase
                        "propstat/status[.='#{status}']/../prop",
                        '' => 'DAV:')
   end
-  
+
   def get_response root, url
       REXML::XPath.first(root,
                          "/multistatus/response/href[.='#{url}']/..",
@@ -205,6 +236,7 @@ class PropstatResponseTest < Test::Unit::TestCase
   end
   
   def setup
+    super
     @propfind_response_str = <<EOS
   <?xml version="1.0" encoding="utf-8" ?>
   <D:multistatus xmlns:D="DAV:">
@@ -338,8 +370,6 @@ EOS
     @container2_401_prop = get_prop @container2_response, 'HTTP/1.1 401 Unauthorized'
     @container2_403_prop = get_prop @container2_response, 'HTTP/1.1 403 Forbidden'
 
-    @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
-    @resourcetype_pk = RubyDav::PropKey.get('DAV:', 'resourcetype')
     @supportedlock_pk = RubyDav::PropKey.get('DAV:', 'supportedlock')
 
     @response2 =
@@ -352,9 +382,15 @@ EOS
     assert_instance_of Hash, @response.resources
   end
 
+  def test_error
+    assert !@response.error?
+    assert @response2.error?
+  end
+
   def test_parse_body
-    urlhash =
-      RubyDav::PropstatResponse.send :parse_body, @propfind_response_str
+    urlhash = RubyDav::PropstatResponse.send(:parse_body,
+                                             @propfind_response_str,
+                                             '/container/')
     expected_urls = ['/container/', '/container/front.html'].sort
     assert_equal expected_urls, urlhash.keys.sort
 
@@ -369,8 +405,9 @@ EOS
   end
 
   def test_parse_body2
-    urlhash =
-      RubyDav::PropstatResponse.send :parse_body, @propfind2_response_str
+    urlhash = RubyDav::PropstatResponse.send(:parse_body,
+                                             @propfind2_response_str,
+                                             '/container2/')
     assert_equal ['/container2/'], urlhash.keys
 
     container2_results = urlhash['/container2/']
