@@ -7,10 +7,10 @@ class PropertyResultTestCase < RubyDavUnitTestCase
   def setup
     super
     displayname_str = "<D:displayname xmlns:D='DAV:'>Bob</D:displayname>"
-    displayname_element = REXML::Document.new(displayname_str).root
+    @displayname_element = REXML::Document.new(displayname_str).root
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
     @result =
-      RubyDav::PropertyResult.new @displayname_pk, '200', displayname_element
+      RubyDav::PropertyResult.new @displayname_pk, '200', @displayname_element
 
     @error_result = RubyDav::PropertyResult.new @displayname_pk, '404', nil, :error
 
@@ -36,6 +36,19 @@ class PropertyResultTestCase < RubyDavUnitTestCase
 
   def test_current_user_privilege_set__not_cups
     assert_nil @result.current_user_privilege_set
+  end
+
+  def test_eql
+    # not sure which object has eql? called on it
+    # so I'm testing it in both directions
+    assert_not_equal @displayname_pk, @result
+    assert_not_equal @result, @displayname_pk
+
+    assert_not_equal @error_result, @result
+
+    expected =
+      RubyDav::PropertyResult.new @displayname_pk, '200', @displayname_element
+    assert_equal expected, @result
   end
 
   def test_initialize

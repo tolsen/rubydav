@@ -21,6 +21,16 @@ module RubyDav
 
     alias cups current_user_privilege_set
 
+    def eql? other
+      other.instance_of?(PropertyResult) &&
+        prop_key == other.prop_key &&
+        status.to_sym == other.status.to_sym &&
+        element == other.element &&
+        error == other.error
+    end
+
+    alias == eql?
+
     def initialize prop_key, status, element = nil, error = nil
       @prop_key = prop_key
       @status = status

@@ -392,53 +392,41 @@ module RubyDav
 
       private
       
-      @@PropstatInfo = Struct.new :status, :dav_error, :props
-      # returns an array of PropstatInfo
+      # returns a hash of PropKey -> PropertyResult
       def parse_propstats parent_elem
-        return RubyDav.xpath_match(parent_elem, 'propstat').map do |ps_elem|
+        properties = {}
+        
+        RubyDav.xpath_match(parent_elem, 'propstat').each do |ps_elem|
           status_elem = RubyDav.xpath_first(ps_elem, 'status')
           raise BadResponseError if status_elem.nil?
           status = RubyDav.parse_status status_elem.text
 
           dav_error_elem = RubyDav.xpath_first ps_elem, 'error'
           dav_error = DavError.parse_dav_error dav_error_elem
-          
-          props = parse_prop RubyDav.xpath_first(ps_elem, 'prop')
 
-          next @@PropstatInfo.new(status, dav_error, props)
-        end
-      end
-
-      def parse_body(body)
-        root = REXML::Document.new(body).root
-        urlhash = {}
-        raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
-        RubyDav.xpath_match(root, 'response').each do |response|
-          href_elem = RubyDav.xpath_first response, 'href'
-          raise BadResponseError if href_elem.nil?
-          href = href_elem.text
-
-          urlhash[href] = {}
-          parse_propstats(response).each do |propstat_info|
-            propstat_info.props.each do |pk, element|
-              urlhash[href][pk] =
-                PropertyResult.new(pk, propstat_info.status,
-                                   element, propstat_info.dav_error)
-            end
+          RubyDav.xpath_first(ps_elem, 'prop').each_element do |property|
+            pk = PropKey.get(property.namespace, property.name)
+            result = PropertyResult.new pk, status, property, dav_error
+            properties[pk] = result
           end
         end
-        return urlhash
+
+        return properties
       end
 
-      # returns a hash of PropKey -> property element
-      def parse_prop(prop_element)
-        prophash = {}
-        prop_element.each_element do |property|
-          propkey = PropKey.get(property.namespace, property.name)
-          prophash[propkey] = property
+      # returns hash of hashes: url -> PropKey -> PropertyResult
+      def parse_body(body)
+        root = REXML::Document.new(body).root
+        raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
+        return RubyDav.xpath_match(root, 'response').inject({}) do |h, r|
+          href_elem = RubyDav.xpath_first r, 'href'
+          raise BadResponseError if href_elem.nil?
+          href = href_elem.text
+          h[href] = parse_propstats r
+          next h
         end
-        return prophash
       end
+
     end
     
 

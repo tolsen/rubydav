@@ -185,27 +185,6 @@ class PropstatResponseTest < Test::Unit::TestCase
     assert_equal element.to_s, result.element.to_s
   end
 
-  # expected is an array of 3-tuples: (status, dav_error, props)
-  def assert_propstats expected, parent_elem
-    expected_h = expected.inject({}) { |h, v| h[v[0]] = v; h }
-
-    propstat_infos =
-      RubyDav::PropstatResponse.send :parse_propstats, parent_elem
-    
-    assert_equal expected.size, propstat_infos.size
-
-    statuses = propstat_infos.map { |i| i.status }
-    assert_equal expected_h.keys.sort, statuses.sort
-
-    propstat_infos.each do |psi|
-      expected_tuple = expected_h[psi.status]
-      
-      assert_equal expected_tuple[1], psi.dav_error
-      assert_equal expected_tuple[2].sort, psi.props.sort
-    end
-  end
-  
-
   def get_prop response, status = 'HTTP/1.1 200 OK'
     REXML::XPath.first(response,
                        "propstat/status[.='#{status}']/../prop",
@@ -321,8 +300,6 @@ EOS
 
     @expected_container_props =
       expected_props @container_prop, @container_prop_keys
-    @expected_front_props =
-      expected_props @front_prop, @front_prop_keys
 
     @response =
       RubyDav::PropstatResponse.create('/container/', '207', {},
@@ -365,17 +342,9 @@ EOS
     @resourcetype_pk = RubyDav::PropKey.get('DAV:', 'resourcetype')
     @supportedlock_pk = RubyDav::PropKey.get('DAV:', 'supportedlock')
 
-    @container2_200_props =
-      expected_props @container2_200_prop, [@displayname_pk]
-    @container2_401_props =
-      expected_props @container2_401_prop, [@resourcetype_pk]
-    @container2_403_props =
-      expected_props @container2_403_prop, [@supportedlock_pk]
-
     @response2 =
       RubyDav::PropstatResponse.create('/container2/', '207', {},
                                           @propfind2_response_str, :propfind)
-
   end
 
   def test_create
@@ -417,22 +386,30 @@ EOS
                            container2_results[@supportedlock_pk], '403')
   end
   
-  
-  def test_parse_prop
-    prophash = RubyDav::PropstatResponse.send :parse_prop, @container_prop
-    assert_equal @expected_container_props, prophash
-  end
-
   def test_parse_propstats
-    expected = [['200', nil, @expected_container_props]]
-    assert_propstats expected, @container_response
+    expected = {}
+    @expected_container_props.each do |pk, prop|
+      expected[pk] = RubyDav::PropertyResult.new pk, '200', prop
+    end
+
+    actual =
+      RubyDav::PropstatResponse.send :parse_propstats, @container_response
+    assert_equal expected, actual
   end
 
   def test_parse_propstats2
-    expected = [['200', nil, @container2_200_props],
-                ['401', nil, @container2_401_props],
-                ['403', nil, @container2_403_props]]
-    assert_propstats expected, @container2_response
+    expected = {}
+    [[@displayname_pk, '200', @container2_200_prop],
+     [@resourcetype_pk, '401', @container2_401_prop],
+     [@supportedlock_pk, '403', @container2_403_prop]].each do |arr|
+      pk, status, prop_element = arr
+      prop = REXML::XPath.first prop_element, "P:#{pk.name}", 'P' => pk.ns
+      expected[pk] = RubyDav::PropertyResult.new pk, status, prop
+    end
+
+    actual =
+      RubyDav::PropstatResponse.send :parse_propstats, @container2_response
+    assert_equal expected, actual
   end
 
   def test_unauthorized
