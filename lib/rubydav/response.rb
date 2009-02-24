@@ -370,12 +370,36 @@ module RubyDav
     
     attr_reader :resources
 
+    # if there is only one url, then you can just pass a prop_key,
+    #  and you will get a PropertyResult
+    # otherwise, you must pass in a url, and you will get a hash
+    #  of PropKey -> PropertyResult
+    def [] url_or_prop_key
+      if url_or_prop_key.is_a?(PropKey) || url_or_prop_key.is_a?(Symbol)
+        if resources.size == 1
+          return resources.values[0][url_or_prop_key]
+        else
+          raise("must pass url because there is " +
+                "more than one url in the response")
+        end
+      else
+        possible_keys =
+          [ url_or_prop_key, url_or_prop_key.chomp('/'),
+            "#{url_or_prop_key}/" ]
+        possible_keys.each do |k|
+          return resources[k] if resources.include? k
+        end
+
+        return nil
+      end
+    end
+
     def error?
       @error ||= @resources.values.any? do |properties|
         properties.values.any? { |r| r.status !~ /^2\d\d$/ }
       end
     end
-    
+
     def initialize(url, status, headers, body, resources)
       super(url, status, headers, body, nil)
       @resources = resources
@@ -400,7 +424,7 @@ module RubyDav
       
       # returns a hash of PropKey -> PropertyResult
       def parse_propstats parent_elem
-        properties = {}
+        properties = Hash.new { |h, k| h[PropKey.strictly_prop_key k ] }
         
         RubyDav.xpath_match(parent_elem, 'propstat').each do |ps_elem|
           status_elem = RubyDav.xpath_first(ps_elem, 'status')

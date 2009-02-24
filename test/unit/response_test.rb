@@ -228,6 +228,14 @@ class PropstatResponseTest < RubyDavUnitTestCase
                          '' => 'DAV:')
   end
 
+  def get_results props
+    results = {}
+    props.each do |pk, prop|
+      results[pk] = RubyDav::PropertyResult.new pk, '200', prop
+    end
+    return results
+  end
+
   def expected_props prop_element, prop_keys
     return prop_keys.inject({}) do |h, k|
       h[k] = REXML::XPath.first(prop_element, "P:#{k.name}", 'P' => k.ns)
@@ -332,10 +340,14 @@ EOS
 
     @expected_container_props =
       expected_props @container_prop, @container_prop_keys
+    @expected_front_props = expected_props @front_prop, @front_prop_keys
+
+    @expected_container_results = get_results @expected_container_props
+    @expected_front_results = get_results @expected_front_props
 
     @response =
       RubyDav::PropstatResponse.create('/container/', '207', {},
-                                          @propfind_response_str, :propfind)
+                                       @propfind_response_str, :propfind)
     @propfind2_response_str = <<EOS
   <?xml version="1.0" encoding="utf-8" ?>
   <D:multistatus xmlns:D="DAV:">
@@ -374,8 +386,62 @@ EOS
 
     @response2 =
       RubyDav::PropstatResponse.create('/container2/', '207', {},
-                                          @propfind2_response_str, :propfind)
+                                       @propfind2_response_str, :propfind)
+
+    @propfind3_response_str = <<EOS
+<?xml version="1.0" encoding="utf-8" ?> 
+<D:multistatus xmlns:D="DAV:"> 
+  <D:response> 
+    <D:href>http://www.example.com/file</D:href> 
+    <D:propstat> 
+      <D:prop>
+        <D:displayname>A File</D:displayname>
+        <D:getcontentlength>555</D:getcontentlength>
+      </D:prop> 
+      <D:status>HTTP/1.1 200 OK</D:status> 
+    </D:propstat> 
+  </D:response> 
+</D:multistatus>
+EOS
+    propfind3_response_root = REXML::Document.new(@propfind3_response_str).root
+    file_response =
+      get_response propfind3_response_root, 'http://www.example.com/file'
+    file_prop = get_prop file_response
+    file_prop_keys = [@displayname_pk, @getcontentlength_pk]
+    expected_file_props = expected_props file_prop, file_prop_keys
+    @expected_file_results = get_results expected_file_props
+    @response3 =
+      RubyDav::PropstatResponse.create('http://www.example.com/file', '207', {},
+                                       @propfind3_response_str, :propfind)
   end
+
+  # tests [] operator
+  def test_brackets__prop_key_multiple_urls
+    assert_raises(RuntimeError) { @response[@displayname_pk] }
+  end
+
+  def test_brackets__prop_key_single_url
+    assert_equal(@expected_file_results[@displayname_pk],
+                 @response3[@displayname_pk])
+  end
+  
+  def test_brackets__symbol_single_url
+    assert_equal(@expected_file_results[@displayname_pk],
+                 @response3[:displayname])
+  end
+  
+  def test_brackets__url
+    assert_equal @expected_container_results, @response['/container/']
+  end
+
+  def test_brackets__url_extra_slash
+    assert_equal @expected_front_results, @response['/container/front.html/']
+  end
+  
+  def test_brackets__url_missing_slash
+    assert_equal @expected_container_results, @response['/container']
+  end
+  
 
   def test_create
     assert_instance_of RubyDav::PropstatResponse, @response
@@ -424,14 +490,13 @@ EOS
   end
   
   def test_parse_propstats
-    expected = {}
-    @expected_container_props.each do |pk, prop|
-      expected[pk] = RubyDav::PropertyResult.new pk, '200', prop
-    end
-
     actual =
       RubyDav::PropstatResponse.send :parse_propstats, @container_response
-    assert_equal expected, actual
+    assert_equal @expected_container_results, actual
+
+    # test hash defaulting of symbols
+    assert_equal(@expected_container_results[@displayname_pk],
+                 actual[:displayname])
   end
 
   def test_parse_propstats2

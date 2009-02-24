@@ -241,7 +241,8 @@ EOS
     @unlock_priv = RubyDav::PropKey.get 'DAV:', 'unlock'
 
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
-    @resourcetype_pk = RubyDav::PropKey.get('DAV:', 'resourcetype')
+    @getcontentlength_pk = RubyDav::PropKey.get 'DAV:', 'getcontentlength'
+    @resourcetype_pk = RubyDav::PropKey.get 'DAV:', 'resourcetype'
   end
   
 end

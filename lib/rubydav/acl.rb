@@ -51,7 +51,7 @@ module RubyDav
         (@isprotected == other.protected?) &&
         (@privileges == other.privileges)
     end
-    alias eq? == 
+    alias eql? == 
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
@@ -210,7 +210,19 @@ module RubyDav
       (self.class == other.class) &&
         super(other)
     end
-    alias :eq? :==
+    alias :eql? :==
+
+    def inherited
+      Acl[*select { |ace| ace.is_a? InheritedAce }]
+    end
+  
+    def modifiable
+      Acl[*reject { |ace| ace.is_a?(InheritedAce) || ace.protected? }]
+    end
+
+    def protected
+      Acl[*select { |ace| ace.protected? }]
+    end
 
     class << self
       

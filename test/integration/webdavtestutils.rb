@@ -92,9 +92,9 @@ module WebDavTestUtils
   end
 
   def get_acl(resource, creds={})
-    response = @request.propfind_acl(resource, 0, creds)
+    response = @request.propfind resource, 0, :acl, creds
     assert_equal '207', response.status
-    response.acl
+    return response[:acl].acl
   end
 
   # lock resource and return lockinfo
@@ -141,4 +141,10 @@ module WebDavTestUtils
 
   end
 
+  def full_path relative_path
+    URI.parse(@host).path + relative_path
+  end
+  
+    
+  
 end

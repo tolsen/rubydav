@@ -73,9 +73,9 @@ class WebDavAclTest < Test::Unit::TestCase
     new_file @testfile
 
     # get the acl 
-    @response = @request.propfind_acl('file', 0)
+    @response = @request.propfind 'file', 0, :acl
     assert !@response.error?
-    @acl = @response.acl
+    @acl = @response[:acl].acl.modifiable
   end
 
   def teardown_acl
@@ -340,11 +340,11 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '409', response.status
     
     # test that the ACL did not change
-    response = @request.propfind_acl(@testfile, 0)
+    response = @request.propfind @testfile, 0, :acl
     assert_equal '207', response.status
-    assert @acl.eq? response.acl
+    assert_equal @acl, response[:acl].acl
 
-    ensure
+  ensure
     teardown_acl
   end
 
@@ -353,8 +353,8 @@ class WebDavAclTest < Test::Unit::TestCase
     
     # test for no-protected-ace-conflict precondition
     # assuming server sets atleast one protected ace per resource
-    assert (!@response.protected_acl.nil?)
-    protected_acl = @response.protected_acl
+    protected_acl = @response[:acl].acl.protected
+    assert_not_nil protected_acl
     protected_ace = protected_acl.first
 
     # try to set an ace, conflicting with the proctected ace
@@ -438,7 +438,8 @@ class WebDavAclTest < Test::Unit::TestCase
   ensure
     teardown_acl
   end
-    
+
+  require 'pp'
   # this should probably be moved to acl_props.rb
   def test_child_read_for_propfind_depth_one
     
@@ -468,11 +469,13 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '207', response.status
 
     # ensure that we got 'file2' in the listing
-    assert response.children.include?('file2')
+    assert response.resources.include?(full_path(testfile2))
 
-    # the status associated with file2 must be 403
-    assert '403', response.children['file2'].status
-
+    # the statuses associated with file2 must be 403
+    response.resources[full_path(testfile2)].values.each do |r|
+      assert_equal '403', r.status
+    end
+    
     # cleanup
     delete_coll testcol
   end
@@ -594,9 +597,11 @@ class WebDavAclTest < Test::Unit::TestCase
     new_coll testcol
     new_file testfile
 
-    response = @request.propfind_acl(testfile, 0)
+    response = @request.propfind testfile, 0, :acl
     assert_equal '207', response.status
-    inherited_acl = response.inherited_acl
+
+    acl = response[:acl].acl
+    inherited_acl = acl.inherited
     
     # nothing to do if the resource has no inherited ace
     if inherited_acl.nil? 
@@ -702,9 +707,10 @@ class WebDavAclTest < Test::Unit::TestCase
     response = @request.acl('/', RubyDav::Acl.new, admincreds)
     assert_equal '200', response.status
 
-    response1 = @request.propfind_acl('file', 0)
-    assert_equal '200', response1.statuses(:acl)
-    assert_equal 0, response1.acl.length
+    response1 = @request.propfind 'file', 0, :acl
+    result1 = response1[:acl]
+    assert_equal '200', result1.status
+    assert_equal 0, result1.acl.modifiable.length
 
     acl = RubyDav::Acl.new
     ace = RubyDav::Ace.new(:grant, :authenticated, false, 'read', 'read-current-user-privilege-set')
@@ -713,16 +719,17 @@ class WebDavAclTest < Test::Unit::TestCase
     response = @request.acl('/', acl, admincreds)
     assert_equal '200', response.status
     
-    response2 = @request.propfind_acl('file', 0)
-    assert_equal '200', response2.statuses(:acl)
+    response2 = @request.propfind 'file', 0, :acl
+    result2 = response2[:acl]
+    assert_equal '200', result2.status
 
     response = @request.acl('/', RubyDav::Acl.new, admincreds)
     assert_equal '200', response.status
 
-    assert_equal response1.protected_acl.length, response2.protected_acl.length
+    assert_equal result1.acl.protected.length, result2.acl.protected.length
 
-    assert_equal 0, response2.acl.length
-    assert_equal((response1.inherited_acl.length + 1), response2.inherited_acl.length)
+    assert_equal 0, result2.acl.modifiable.length
+    assert_equal (result1.acl.inherited.length + 1), result2.acl.inherited.length
 
     delete_file 'file'
   end

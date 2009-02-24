@@ -16,10 +16,10 @@ class WebDavAclLocksTest < Test::Unit::TestCase
 
     # this maybe done in a single propfind.
     acl_props.each do |prop|
-        propkey = RubyDav::PropKey.get('DAV:', prop)
-        response = @request.propfind(lknull_res, 0, propkey)
-        assert_equal '207', response.status
-        assert_equal '404', response.statuses(propkey)
+      propkey = RubyDav::PropKey.get('DAV:', prop)
+      response = @request.propfind(lknull_res, 0, propkey)
+      assert_equal '207', response.status
+      assert_equal '404', response[propkey].status
     end
 
     # cleanup

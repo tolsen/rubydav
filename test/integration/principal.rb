@@ -7,6 +7,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   include WebDavTestSetup
   def setup
     webdavtestsetup
+    @cartman_uri = get_principal_uri 'cartman'
   end
 
   def delete_user user
@@ -18,62 +19,62 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_put_for_creating_user
-    response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
 
     delete_user 'cartman'
   end
 
   def test_create_user_requires_displayname
-    response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :email => 'cartman@example.com'})
+    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :email => 'cartman@example.com'})
     assert response.error?
 
     # sanity check, try to propfind the principal url, should get 404
-    response = @request.propfind(get_principal_uri('cartman'), 0, :displayname )
+    response = @request.propfind(@cartman_uri, 0, :displayname )
     assert_equal '404', response.status
   end
 
   def test_put_for_updating_displayname
-    response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
     
-    response = @request.put_user(get_principal_uri('cartman'), {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '403', response.status
 
     # update displayname
-    response = @request.put_user(get_principal_uri('cartman'), {:displayname => 'Eric Cartman',  :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, {:displayname => 'Eric Cartman',  :username => 'cartman', :password => 'cartman'})
     assert_equal '204', response.status
 
-    response = @request.propfind(get_principal_uri('cartman'), 0, :displayname )
+    response = @request.propfind(@cartman_uri, 0, :displayname )
     assert_equal '207', response.status
-    assert_equal 'Eric Cartman', response[:displayname].strip
-
+    erics_name = response[@cartman_uri][:displayname].inner_value.strip
+    assert_equal 'Eric Cartman', erics_name
     delete_user 'cartman'
   end
 
   def test_put_for_updating_password_requires_current_password
-    response = @request.put_user(get_principal_uri('cartman'), { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
 
     # try changing password without old password
-    response = @request.put_user(get_principal_uri('cartman'), { :new_password => 'manbearpig', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :username => 'cartman', :password => 'cartman'})
     assert_equal '400', response.status
 
-    response = @request.put_user(get_principal_uri('cartman'), { :new_password => 'manbearpig', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'
   end
 
   def test_put_for_updating_email_requires_current_password
-    response = @request.put_user(get_principal_uri('cartman'), { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
 
     # try changing email without password
-    response = @request.put_user(get_principal_uri('cartman'), { :email => 'manbearpig@southpark.com', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :username => 'cartman', :password => 'cartman'})
     assert_equal '400', response.status
 
-    response = @request.put_user(get_principal_uri('cartman'), { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'
@@ -94,13 +95,14 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   def assert_group_members group_url, *members
     response = @request.propfind(group_url, 0, :"group-member-set")
     assert_equal '207', response.status
-    assert_xml_matches "<wrap>" + response[:"group-member-set"] + "</wrap>" do |xml|
-      xml.wrap {
-        xml.xmlns!({:D => "DAV:" })
+    prop_value = response[group_url][:"group-member-set"].value
+    assert_xml_matches prop_value do |xml|
+      xml.xmlns! 'DAV:'
+      xml.send :"group-member-set" do
         members.each do |prin_url|
-          xml.D :href, baseuri + prin_url
+          xml.href(baseuri + prin_url)
         end
-      }
+      end
     end
   end
 
@@ -111,7 +113,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     end
     response = @request.proppatch(group_url, {:"group-member-set" => hrefxml })
     assert_equal '207',response.status
-    assert_equal '200', response.statuses(:"group-member-set")
+    assert_equal '200', response[group_url][:"group-member-set"].status
   end
 
   def test_put_for_creating_group
@@ -119,7 +121,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
 
     response = @request.propfind(group_url, 0, :resourcetype)
     assert_equal '207', response.status
-    assert_match 'D:principal', response[:resourcetype]
+    assert_match 'D:principal', response[group_url][:resourcetype].inner_value
 
     @request.delete group_url, admincreds
   end
@@ -240,15 +242,15 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_bad_put_user_followed_by_smaller_good_put_user
-    response = @request.put_user(get_principal_uri('cartman'), { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '201', response.status
 
     # big put_user that fails
-    response = @request.put_user(get_principal_uri('cartman'), { :email => 'manbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpig@southpark.com',:username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpig@southpark.com',:username => 'cartman', :password => 'cartman'})
     assert_equal '400', response.status
 
     # smaller put_user that should succeed
-    response = @request.put_user(get_principal_uri('cartman'), { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'
