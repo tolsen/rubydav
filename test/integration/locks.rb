@@ -95,7 +95,7 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     # do a profind on the parent and check DAV:resourcetype of coll
     response = @request.propfind('coll', 0, :resourcetype)
-    assert_match /collection/, response.propertyhash[RubyDav::PropKey.get("DAV:", "resourcetype")]
+    assert_match /collection/, response[:resourcetype].inner_value
 
     # delete without locktoken
     response = @request.delete('coll')
@@ -118,14 +118,14 @@ class WebDavLocksTest < Test::Unit::TestCase
     # store the lock token returned by the server
     lockinfo = response.lockinfo
 
-    response = @request.propfind_cups('', 1)
-    assert_not_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_not_nil response["#{@uri.path}locknull"]
 
     response = @request.unlock('locknull', lockinfo.token)
     assert_equal '204', response.status
     
-    response = @request.propfind_cups('', 1)
-    assert_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_nil response["#{@uri.path}locknull"]
   end
 
   # Create a shared lock-null resource and take another shared lock it.
@@ -151,8 +151,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unlock('locknull', lockinfo2.token)
     assert_equal '204', response.status
 
-    response = @request.propfind_cups('', 1)
-    assert_not_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_not_nil response["#{@uri.path}locknull"]
 
     # assert that old locktoken doesn't work anymore
     response = @request.unlock('locknull', lockinfo2.token)
@@ -161,8 +161,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unlock('locknull', lockinfo1.token)
     assert_equal '204', response.status
     
-    response = @request.propfind_cups('', 1)
-    assert_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_nil response["#{@uri.path}locknull"]
   end
 
   def test_propfind_on_locknull
@@ -179,19 +179,19 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     response = @request.propfind('locknull', 0, :creationdate, :displayname, :resourcetype, :"resource-id")
     assert_equal '207', response.status
-    assert response[:"resource-id"].strip.length > 0
+    assert response[:"resource-id"].inner_value.strip.length > 0
 
     response = @request.propfind('', 1, :creationdate, :displayname, :resourcetype, :"resource-id")
-    locknull_response = response.children['locknull']
+    locknull_response = response["#{@uri.path}locknull"]
     assert_not_nil locknull_response
 
-    assert locknull_response[:"resource-id"].strip.length > 0
+    assert locknull_response[:"resource-id"].inner_value.strip.length > 0
 
     response = @request.unlock('locknull', lockinfo.token)
     assert_equal '204', response.status
     
-    response = @request.propfind_cups('', 1)
-    assert_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_nil response["#{@uri.path}locknull"]
   end
 
   def test_move_on_locknull
@@ -211,8 +211,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unlock('locknull', lockinfo.token)
     assert_equal '204', response.status
     
-    response = @request.propfind_cups('', 1)
-    assert_nil response.children['locknull']
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_nil response["#{@uri.path}locknull"]
   end
 
   def test_expired_locknull
@@ -230,8 +230,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.propfind(res_name, 0, :displayname)
     assert_equal '404', response.status
     
-    response = @request.propfind_cups('', 1)
-    assert_nil response.children[res_name]
+    response = @request.propfind '', 1, :"current-user-privilege-set"
+    assert_nil response["#{@uri.path}res_name"]
  end
 
   # check that lock on collection will fail if we don't have permissions on a child
@@ -249,9 +249,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '201', response.status
 
     # get the acl of collection
-    response = @request.propfind_acl('coll', 0)
+    response = @request.propfind 'coll', 0, :acl
     assert !response.error?
-    acl = response.acl
+    acl = response[:acl].acl.modifiable
 
     # grant test user all privileges on collection
     acl.unshift RubyDav::Ace.new(:grant, test_principal_uri, false, :all)
@@ -259,9 +259,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '200', response.status
 
     # get acl of secret file
-    response = @request.propfind_acl('coll/secret', 0)
+    response = @request.propfind 'coll/secret', 0, :acl
     assert !response.error?
-    acl = response.acl
+    acl = response[:acl].acl.modifiable
 
     # deny test user all privileges on secret file
     acl.unshift RubyDav::Ace.new(:deny, test_principal_uri, false, :all)

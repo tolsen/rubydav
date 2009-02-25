@@ -2,6 +2,7 @@ require 'test/unit/unit_test_helper'
 
 class AceTest < RubyDavUnitTestCase
   def setup
+    super
     @ace =  create_ace :grant, :all, true, "write", "read"
   end
   
@@ -45,7 +46,7 @@ class AceTest < RubyDavUnitTestCase
   
   def test_privileges
     assert_equal 2, @ace.privileges.size
-    assert_equal [:write,:read], @ace.privileges
+    assert_equal [@write_priv, @read_priv], @ace.privileges
   end
   
   def test_equality
@@ -113,11 +114,11 @@ class AceTest < RubyDavUnitTestCase
   
   def test_addprivileges
     assert_equal 2, @ace.privileges.size
-    assert_equal [:write,:read], @ace.privileges
+    assert_equal [@write_priv, @read_priv], @ace.privileges
     
     @ace.addprivileges([:"read-acl"])
     assert_equal 3, @ace.privileges.size
-    assert_equal [:write,:read,:"read-acl"], @ace.privileges
+    assert_equal [@write_priv, @read_priv, @read_acl_priv], @ace.privileges
   end
 
   def test_from_elem__bad_action
@@ -328,6 +329,17 @@ EOS
     assert_ace_xml @ace, :all
   end
 
+  def test_normalize_privileges
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(@read_priv, @write_priv))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(:read, :write))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges('read', 'write'))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(@read_priv, :write))
+  end
+
   def assert_ace_xml ace, principal, action = :grant
 
     assert_xml_matches ace.printXML do |xml|
@@ -505,7 +517,7 @@ class AclTest < RubyDavUnitTestCase
     @acl.unshift ace
     
     assert_equal 1, @acl.size
-    assert_equal [:read,:"read-acl"], @acl[0].privileges
+    assert_equal [@read_priv, @read_acl_priv], @acl[0].privileges
   end
   
   def test_unshift_with_compacting_true_and_inherited_ace
@@ -514,9 +526,9 @@ class AclTest < RubyDavUnitTestCase
     @acl.unshift @iace
     
     assert_equal 2, @acl.size
-    assert_equal [:"read-acl"], @acl[0].privileges
+    assert_equal [@read_acl_priv], @acl[0].privileges
     assert_equal "http://www.example.org", @acl[0].url
-    assert_equal [:"read-acl"], @acl[1].privileges
+    assert_equal [@read_acl_priv], @acl[1].privileges
   end
   
   def test_unshift_with_compacting_false
@@ -526,8 +538,8 @@ class AclTest < RubyDavUnitTestCase
     @acl.unshift ace
     
     assert_equal 2, @acl.size
-    assert_equal [:read], @acl[0].privileges
-    assert_equal [:"read-acl"], @acl[1].privileges
+    assert_equal [@read_priv], @acl[0].privileges
+    assert_equal [@read_acl_priv], @acl[1].privileges
   end
 
   def test_printXML

@@ -8,10 +8,10 @@ class WebDavDeltavTest < Test::Unit::TestCase
     webdavtestsetup
   end
 
-  def href_elem_to_url(href)
-    doc = REXML::Document.new(href)
-    href = RubyDav.remove_trailing_slashes(doc.root.text)
-    "http://#{@uri.host}:#{@uri.port}" + href
+  def href_elem_to_url prop_result
+    href_element = RubyDav.xpath_first prop_result.element, 'href'
+    href = RubyDav.remove_trailing_slashes(href_element.text)
+    return "http://#{@uri.host}:#{@uri.port}" + href
   end
 
   # check DAV:put-under-version-control
@@ -29,7 +29,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
     response = @request.propfind(version_history, 0, :"root-version", :resourcetype, creds)
     root_version = href_elem_to_url response[:"root-version"]
     assert_equal new_version, root_version
-    assert response[:resourcetype].match("version-history")
+    assert response[:resourcetype].inner_value.match("version-history")
   end
 
   def test_simple_version_control
@@ -123,7 +123,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
     response = @request.proppatch(file, { author_prop_key => 'chetan' })
     assert !response.error?
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(author_prop_key)
+    assert_equal '200', response[author_prop_key].status
 
     response = @request.version_control file
     assert_equal '200', response.status
@@ -155,7 +155,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
     response = @request.proppatch(file, { author_prop_key => 'chetan' })
     assert !response.error?
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(author_prop_key)
+    assert_equal '200', response[author_prop_key].status
 
     response = @request.version_control file
     assert_equal '200', response.status
@@ -194,7 +194,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
     response = @request.proppatch(file, { checkedin_pk => 'illegalvalue' })
     assert_equal '207', response.status
     # FIXME hmmm.. should this be 403 or 412?
-    assert_equal '403', response.statuses(checkedin_pk)
+    assert_equal '403', response[checkedin_pk].status
 
     delete_file 'file'
   end
@@ -226,8 +226,8 @@ class WebDavDeltavTest < Test::Unit::TestCase
     assert_equal '204', response.status
     
     response = @request.propfind(srcfile, 0, :"checked-out", :"version-history")
-    assert_equal '404', response.statuses(:"checked-out")
-    assert_equal '404', response.statuses(:"version-history")
+    assert_equal '404', response[:"checked-out"].status
+    assert_equal '404', response[:"version-history"].status
 
     # delete the checked-out vcr
     delete_file file
@@ -249,7 +249,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
     assert_equal '207', response.status
 
     # we have created three versions. assert that version-tree-report presented all of them
-    assert_equal 3, response.versions.length
+    assert_equal 3, response.resources.length
 
     #FIXME test for the response elements
     delete_file file
@@ -284,21 +284,22 @@ class WebDavDeltavTest < Test::Unit::TestCase
 
     response = @request.propfind('testcol', 0, lb_av_new_children_propkey)
     assert_equal '207', response.status
-    assert_equal '404', response.statuses(lb_av_new_children_propkey)
+    assert_equal '404', response[lb_av_new_children_propkey].status
 
     av_val = ::Builder::XmlMarkup.new
     av_val.D(:"checkout-checkin")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
     response = @request.propfind('testcol', 0, lb_av_new_children_propkey)
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
-    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+    assert_xml_matches(response[lb_av_new_children_propkey].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"checkout-checkin"
+      xml.xmlns! :L => 'http://limebits.com/ns/1.0/'
+      xml.L(:'auto-version-new-children') { xml.D :"checkout-checkin" }
     end
 
     delete_coll 'testcol'
@@ -313,18 +314,19 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.D(:"checkout-checkin")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
     response = @request.mkcol 'testcol/childcol'
     assert '201', response.status
 
     response = @request.propfind('testcol/childcol', 0, lb_av_new_children_propkey)
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
-    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+    assert_xml_matches(response[lb_av_new_children_propkey].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"checkout-checkin"
+      xml.xmlns! :L => 'http://limebits.com/ns/1.0/'
+      xml.L(:'auto-version-new-children') { xml.D :"checkout-checkin" }
     end
 
     delete_coll 'testcol'
@@ -339,14 +341,14 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.lb(:"version-control", "xmlns:lb" => "http://limebits.com/ns/1.0/")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200',  response[lb_av_new_children_propkey].status
 
     new_file 'testcol/file', @stream
 
     check_postcond_dav_put_under_version_control('testcol/file')
 
     response = @request.propfind('testcol/file', 0, :"auto-version")
-    assert_equal '404', response.statuses(:"auto-version")
+    assert_equal '404', response[:"auto-version"].status
 
     delete_coll 'testcol'
   end
@@ -376,18 +378,18 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.D(:"checkout-checkin")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
     new_file 'testcol/file', @stream
 
     check_postcond_dav_put_under_version_control('testcol/file')
 
     response = @request.propfind('testcol/file', 0, :"auto-version")
-    assert_equal '200', response.statuses(:"auto-version")
+    assert_equal '200', response[:"auto-version"].status
 
-    assert_xml_matches(response[:"auto-version"]) do |xml|
+    assert_xml_matches(response[:"auto-version"].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"checkout-checkin"
+      xml.D(:"auto-version") { xml.D :"checkout-checkin" }
     end
 
     helper_test_auto_version_checkout_checkin 'testcol/file'
@@ -423,17 +425,17 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.D(:"checkout-unlocked-checkin")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200',  response[lb_av_new_children_propkey].status
 
     new_file 'testcol/file', @stream
 
     check_postcond_dav_put_under_version_control('testcol/file')
 
     response = @request.propfind('testcol/file', 0, :"auto-version")
-    assert_equal '200', response.statuses(:"auto-version")
-    assert_xml_matches(response[:"auto-version"]) do |xml|
+    assert_equal '200', response[:"auto-version"].status
+    assert_xml_matches(response[:"auto-version"].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"checkout-unlocked-checkin"
+      xml.D(:"auto-version") { xml.D :"checkout-unlocked-checkin" }
     end
 
     helper_test_auto_version_checkout_unlocked_checkin 'testcol/file'
@@ -455,17 +457,17 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.D(:"checkout")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
     new_file 'testcol/file', @stream
 
     check_postcond_dav_put_under_version_control('testcol/file')
 
     response = @request.propfind('testcol/file', 0, :"auto-version")
-    assert_equal '200', response.statuses(:"auto-version")
-    assert_xml_matches(response[:"auto-version"]) do |xml|
+    assert_equal '200', response[:"auto-version"].status
+    assert_xml_matches(response[:"auto-version"].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"checkout"
+      xml.D(:"auto-version") { xml.D :"checkout" }
     end
 
     delete_coll 'testcol'
@@ -481,17 +483,17 @@ class WebDavDeltavTest < Test::Unit::TestCase
     av_val.D(:"locked-checkout")
 
     response = @request.proppatch('testcol', {lb_av_new_children_propkey => av_val})
-    assert response.propertyhash[lb_av_new_children_propkey]
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
     new_file 'testcol/file', @stream
 
     check_postcond_dav_put_under_version_control('testcol/file')
 
     response = @request.propfind('testcol/file', 0, :"auto-version")
-    assert_equal '200', response.statuses(:"auto-version")
-    assert_xml_matches(response[:"auto-version"]) do |xml|
+    assert_equal '200', response[:"auto-version"].status
+    assert_xml_matches(response[:"auto-version"].value) do |xml|
       xml.xmlns! :D => "DAV:"
-      xml.D :"locked-checkout"
+      xml.D(:"auto-version") { xml.D :"locked-checkout" }
     end
 
     delete_coll 'testcol'
@@ -588,11 +590,11 @@ class WebDavDeltavTest < Test::Unit::TestCase
       
     response = @request.propfind('dstcol/subcol', 0, lb_av_new_children_propkey)
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(lb_av_new_children_propkey)
+    assert_equal '200', response[lb_av_new_children_propkey].status
 
-    assert_xml_matches(response[lb_av_new_children_propkey]) do |xml|
+    assert_xml_matches(response[lb_av_new_children_propkey].value) do |xml|
       xml.xmlns! :lb => "http://limebits.com/ns/1.0/"
-      xml.lb :"version-control"
+      xml.lb(:"auto-version-new-children") { xml.lb :"version-control" }
     end
 
   end

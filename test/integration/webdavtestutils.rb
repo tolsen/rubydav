@@ -94,7 +94,7 @@ module WebDavTestUtils
   def get_acl(resource, creds={})
     response = @request.propfind resource, 0, :acl, creds
     assert_equal '207', response.status
-    return response[:acl].acl
+    return response[:acl].acl.modifiable
   end
 
   # lock resource and return lockinfo

@@ -22,11 +22,7 @@ module RubyDav
     attr_reader :privileges
 
     def initialize(action, principal, isprotected, *privileges)
-      @privileges = Array.new
-      privileges.each do |priv|
-        priv = priv.to_sym unless (priv.is_a?(Symbol) || priv.is_a?(PropKey))
-        @privileges << priv
-      end
+      @privileges = self.class.normalize_privileges *privileges
       @isprotected = isprotected
       principal = PropKey.strictly_prop_key principal if ((Symbol === principal) &&
                                                           (principal != :all) &&
@@ -83,7 +79,7 @@ module RubyDav
     end
     
     def addprivileges(privileges)
-      @privileges |= privileges
+      @privileges |= self.class.normalize_privileges(*privileges)
     end
 
     def to_s
@@ -117,6 +113,13 @@ module RubyDav
         else
           return InheritedAce.new(inherited_url.to_s, action, principal,
                                   protected, *privileges)
+        end
+      end
+
+      def normalize_privileges *privileges
+        privileges.map do |p|
+          p = p.to_sym if p.is_a? String
+          next PropKey.strictly_prop_key(p)
         end
       end
 

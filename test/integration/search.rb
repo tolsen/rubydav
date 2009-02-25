@@ -23,11 +23,11 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 1, response
 
     # the result must contain file
-    fileresponse = response.responsehash[homepath + 'file']
+    fileresponse = response[homepath + 'file']
     assert_not_nil fileresponse
 
     # property getcontentlength must've been reported
-    assert_equal 64, fileresponse.propertyhash[RubyDav::PropKey.strictly_prop_key(:getcontentlength)].to_i
+    assert_equal 64, fileresponse[:getcontentlength].inner_value.to_i
 
     # cleanup
     delete_file 'file'
@@ -47,11 +47,11 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 1, response
 
     # result must contain file
-    fileresponse = response.responsehash[homepath + 'test-search-resource-id/file']
+    fileresponse = response[homepath + 'test-search-resource-id/file']
     assert_not_nil fileresponse
 
     # property resource-id must've been reported
-    assert_not_nil fileresponse.propertyhash[RubyDav::PropKey.strictly_prop_key(:'resource-id')]
+    assert_not_nil fileresponse[:'resource-id']
 
     # cleanup
     delete_coll 'test-search-resource-id'
@@ -85,14 +85,14 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 2, response
 
     # make sure we got both file1 and file3
-    file1response = response.responsehash[homepath + 'file1']
-    file3response = response.responsehash[homepath + 'file3']
+    file1response = response[homepath + 'file1']
+    file3response = response[homepath + 'file3']
     assert_not_nil file1response
     assert_not_nil file3response
 
     # dead property tag must've been reported as 'interesting'
-    assert_equal 'interesting', file1response.propertyhash[tag_pkey]
-    assert_equal 'interesting', file3response.propertyhash[tag_pkey]
+    assert_equal 'interesting', file1response[tag_pkey].inner_value
+    assert_equal 'interesting', file3response[tag_pkey].inner_value
 
     # cleanup
     delete_file file1
@@ -128,8 +128,8 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 2, response
 
     # make sure we got file2 and file3
-    assert_not_nil response.responsehash[homepath + 'file2']
-    assert_not_nil response.responsehash[homepath + 'file3']
+    assert_not_nil response[homepath + 'file2']
+    assert_not_nil response[homepath + 'file3']
 
     # search for files with more than aa rating
     where = like(rating_pkey, 'aa_')
@@ -140,7 +140,7 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 1, response
 
     # make sure we got file3
-    assert_not_nil response.responsehash[homepath + 'file3']
+    assert_not_nil response[homepath + 'file3']
 
     # cleanup
     delete_file file1
@@ -166,8 +166,8 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 3, response
 
     # make sure we got coll1 and coll2
-    assert_not_nil response.responsehash[homepath + coll1]
-    assert_not_nil response.responsehash[homepath + coll2]
+    assert_not_nil response[homepath + coll1]
+    assert_not_nil response[homepath + coll2]
 
     # cleanup
     delete_coll 'testsearch'
@@ -198,8 +198,8 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 2, response
 
     # make sure we got file1 and file3
-    assert_not_nil response.responsehash[homepath + 'file1']
-    assert_not_nil response.responsehash[homepath + 'file3']
+    assert_not_nil response[homepath + 'file1']
+    assert_not_nil response[homepath + 'file3']
 
     # cleanup
     delete_file file1
@@ -244,8 +244,8 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 2, response
 
     # make sure we got file1, testfile2
-    assert_not_nil response.responsehash[homepath + 'file1']
-    assert_not_nil response.responsehash[testhomepath + 'file2']
+    assert_not_nil response[homepath + 'file1']
+    assert_not_nil response[testhomepath + 'file2']
 
     # cleanup
     delete_file file1
@@ -273,7 +273,7 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 1, response
 
     # the result must contain file1
-    assert_not_nil response.responsehash[homepath + file1]
+    assert_not_nil response[homepath + file1]
 
     response = @request.search('testsearch', scope, where, :allprop, :orderby => [[:getcontentlength, :descending]], :limit => 1 )
 
@@ -281,7 +281,7 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_num_search_results 1, response
 
     # the result must contain file3
-    assert_not_nil response.responsehash[homepath + file3]
+    assert_not_nil response[homepath + file3]
 
     # cleanup
     delete_coll 'testsearch'
@@ -351,11 +351,11 @@ END_OF_WHERE
     assert_num_search_results 1, response
 
     # the result must contain file1
-    file1response = response.responsehash[homepath + 'file1']
+    file1response = response[homepath + 'file1']
     assert_not_nil file1response
 
     # property getcontentlength must've been reported
-    assert_equal 64, file1response.propertyhash[RubyDav::PropKey.strictly_prop_key(:getcontentlength)].to_i
+    assert_equal 64, file1response[:getcontentlength].inner_value.to_i
 
     # cleanup
     delete_file 'file1'
@@ -389,24 +389,24 @@ END_OF_WHERE
     scope = { homepath => :infinity }
     responses = @request.search('', scope, where, :owner)
     assert_num_search_results 1, responses
-    response = responses.responsehash[homepath + 'test_search']
+    response = responses[homepath + 'test_search']
     assert_not_nil response
-    assert_not_nil response.propertyhash[RubyDav::PropKey.strictly_prop_key(:owner)]
+    assert_not_nil response[:owner]
 
     # now search for owner property with incorrect namespace
     bad_ns_owner_pkey = RubyDav::PropKey.get('http://www.example.com/ns', 'owner')
     responses = @request.search('', scope, where, bad_ns_owner_pkey)
     assert_num_search_results 1, responses
-    response = responses.responsehash[homepath + 'test_search']
+    response = responses[homepath + 'test_search']
     assert_not_nil response
-    assert_equal '404', response.statuses(bad_ns_owner_pkey)
+    assert_equal '404', response[bad_ns_owner_pkey].status
 
     # cleanup
     delete_file 'test_search'
   end
 
   def assert_num_search_results exp, response
-    assert_equal exp+1, response.responses.length
+    assert_equal exp, response.resources.length
   end
 
   def homepath

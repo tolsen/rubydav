@@ -14,15 +14,15 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     response = @request.proppatch(prin_uri, { lb_email_propkey => 'foo@bar.com' })
     assert_equal '207', response.status
     assert !response.error?
-    assert response.propertyhash[lb_email_propkey]
+    assert_equal '200', response[lb_email_propkey].status
 
     response = @request.propfind(prin_uri, 0, lb_email_propkey)
     assert_equal '207', response.status
-    assert_equal 'foo@bar.com', response.propertyhash[lb_email_propkey].strip
+    assert_equal 'foo@bar.com', response[lb_email_propkey].inner_value.strip
     
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
-    assert_equal '403', response.statuses(lb_email_propkey)
+    assert_equal '403', response[lb_email_propkey].status
   end
 
   def test_limebits_read_private_properties_priv
@@ -32,11 +32,11 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     response = @request.proppatch(prin_uri, { lb_email_propkey => 'foo@bar.com' })
     assert_equal '207', response.status
     assert !response.error?
-    assert response.propertyhash[lb_email_propkey]
+    assert_equal '200', response[lb_email_propkey].status
 
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
-    assert_equal '403', response.statuses(lb_email_propkey)
+    assert_equal '403', response[lb_email_propkey].status
 
     lb_read_priv_properties_key = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'read-private-properties')
     # grant test user all privileges on coll
@@ -45,8 +45,8 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
 
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(lb_email_propkey)
-    assert_equal 'foo@bar.com', response.propertyhash[lb_email_propkey].strip
+    assert_equal '200', response[lb_email_propkey].status
+    assert_equal 'foo@bar.com', response[lb_email_propkey].inner_value.strip
 
     acl.shift
     response = @request.acl prin_uri, acl
@@ -54,7 +54,7 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
 
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
-    assert_equal '403', response.statuses(lb_email_propkey)
+    assert_equal '403', response[lb_email_propkey].status
   end
 
   def test_dav_read_private_properties_priv
@@ -77,7 +77,7 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
 
     response = @request.propfind(prin_uri, 0, lb_domain_map_propkey)
     assert_equal '207', response.status
-    assert_equal '404', response.statuses(lb_domain_map_propkey) 
+    assert_equal '404', response[lb_domain_map_propkey].status
 
   end
 
@@ -119,7 +119,7 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     response = @request.proppatch(uri, { lb_domain_map_propkey => xml })
     assert_equal '207', response.status
     assert !response.error?
-    assert response.propertyhash[lb_domain_map_propkey]
+    assert_equal '200', response[lb_domain_map_propkey].status
 
     response = @request.propfind(uri, 0, lb_domain_map_propkey)
     assert_equal '207', response.status

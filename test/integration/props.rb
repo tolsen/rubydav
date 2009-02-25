@@ -18,19 +18,9 @@ class WebDavPropsTest < Test::Unit::TestCase
     response = @request.propfind('file',0, :allprop)
     assert_equal '207',response.status
     
-    # TO PRINT THE PROPERTIES
-    #response.propertyhash.each do |key,value|
-    #  puts key
-    #  puts value
-    #end
-    
     #PROPNAME
     response = @request.propfind('file',0, :propname)
     assert_equal '207',response.status
-    # TO PRINT THE PROPERTY NAMES
-    #response.propertyhash.each do |key,value|
-    #  puts key
-    #end
     
     response = @request.delete('file')
     response = @request.get('file')
@@ -66,7 +56,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     response = @request.propfind('', RubyDav::INFINITY, :getetag)
     assert_equal '207', response.status
     # Make sure we got all properties for all resources
-    assert_equal 11, response.responses.length
+    assert_equal 11, response.resources.length
 
     # cleanup
     delete_coll 'a'
@@ -82,12 +72,13 @@ class WebDavPropsTest < Test::Unit::TestCase
     response = @request.proppatch('file', { RubyDav::PropKey.get(ns, 'author') => 'myname'})
     assert_equal '207',response.status
     assert !response.error?
-    assert response.propertyhash[RubyDav::PropKey.get(ns, 'author')]
+    assert_equal '200', response[RubyDav::PropKey.get(ns, 'author')].status
     
     response = @request.propfind('file', 0, :allprop)
     assert_equal '207',response.status
     
-    assert_equal 'myname', response.propertyhash[RubyDav::PropKey.get(ns, 'author')].strip
+    assert_equal('myname',
+                 response[RubyDav::PropKey.get(ns, 'author')].inner_value.strip)
     
     response = @request.delete('file')
     response = @request.get('file')
@@ -119,12 +110,12 @@ class WebDavPropsTest < Test::Unit::TestCase
     response = @request.proppatch('file', {author_prop_key => doc})
     assert_equal '207',response.status
     assert !response.error?
-    assert response.propertyhash[author_prop_key]
+    assert_equal '200', response[author_prop_key].status
 
     # retrieve the value of the property from the server
     response = @request.propfind('file', 0, author_prop_key)
     assert_equal '207',response.status
-    server_val = response.propertyhash[author_prop_key]
+    server_val = response[author_prop_key].inner_value
 
     # assert that the returned value is xml equivalent to the value we sent
     assert_xml_equal doc, '<?xml version="1.0" encoding="UTF-8"?>' + server_val
@@ -150,33 +141,33 @@ class WebDavPropsTest < Test::Unit::TestCase
       assert !response.error?
 
       assert_equal '207', response.status
-      assert_equal '200', response.statuses(author_prop_key)
+      assert_equal '200', response[author_prop_key].status
 
       response = @request.propfind('file', 0, author_prop_key)
       assert_equal '207', response.status
-      assert_equal 'chetan', response.propertyhash[author_prop_key].strip
+      assert_equal 'chetan', response[author_prop_key].inner_value.strip
     rescue Test::Unit::AssertionFailedError
       case state
       when :illegal_props_list
         assert_equal '207',response.status
-        assert_equal '424', response.statuses(author_prop_key)
-        assert (response.statuses(:resourcetype) =~ /40[3|9]/)
+        assert_equal '424', response[author_prop_key].status
+        assert_match /40[3|9]/, response[:resourcetype].status
 
         response = @request.propfind('file', 0, author_prop_key)
         assert_equal '207', response.status
-        assert_equal '404', response.statuses(author_prop_key)
+        assert_equal '404', response[author_prop_key].status
 
         update_props = { author_prop_key => 'chetan', :resourcetype => 'illegitimate' }
         state = :illegal_reverse
         retry
       when :illegal_reverse
         assert_equal '207',response.status
-        assert_equal '424', response.statuses(author_prop_key)
-        assert (response.statuses(:resourcetype) =~ /40[3|9]/)
+        assert_equal '424', response[author_prop_key].status
+        assert_match /40[3|9]/, response[:resourcetype].status
 
         response = @request.propfind('file', 0, author_prop_key)
         assert_equal '207', response.status
-        assert_equal '404', response.statuses(author_prop_key)
+        assert_equal '404', response[author_prop_key].status
 
         update_props = { author_prop_key => 'chetan' }
         state = :legal_props
@@ -197,7 +188,7 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.propfind('testfile', 0, :getlastmodified)
     assert_equal '207', response.status
-    getlastmodified1 = response.propertyhash[glm_pkey]
+    getlastmodified1 = response[glm_pkey].inner_value
 
     sleep 3
     response = @request.put('testfile', @stream)
@@ -205,7 +196,7 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.propfind('testfile', 0, :getlastmodified)
     assert_equal '207', response.status
-    getlastmodified2 = response.propertyhash[glm_pkey]
+    getlastmodified2 = response[glm_pkey].inner_value
 
     assert_not_equal getlastmodified1, getlastmodified2
 
@@ -219,7 +210,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     
     response = @request.propfind('testfile', 0, :creationdate)
     assert_equal '207', response.status
-    creationdate1 = response.propertyhash[cdate_pkey]
+    creationdate1 = response[cdate_pkey].inner_value
 
     sleep 3
     response = @request.put('testfile', @stream)
@@ -227,7 +218,7 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.propfind('testfile', 0, :creationdate)
     assert_equal '207', response.status
-    creationdate2 = response.propertyhash[cdate_pkey]
+    creationdate2 = response[cdate_pkey].inner_value
 
     assert_equal creationdate1, creationdate2
 

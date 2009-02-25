@@ -43,6 +43,14 @@ module WebDavTestSetup
     @filesize = File.size 'test/integration/webdavtestsetup.rb'
     @stream = StringIO.new @filebody
     @bigfilepath = 'test/integration/data/bigfile'
+
+    @privs = (%w(all read read-current-user-privilege-set read-acl write) +
+              %w(write write-acl write-content write-properties unlock) +
+              %w(bind unbind)).inject({}) do |h, name|
+      h[name.to_sym] = RubyDav::PropKey.get 'DAV:', name
+      h
+    end
+    @privs[:"read-cups"] = @privs[:"read-current-user-privilege-set"]
   end
 
   # creds for 'test' user
