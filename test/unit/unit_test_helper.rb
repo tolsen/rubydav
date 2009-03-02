@@ -79,56 +79,6 @@ EOS
   def setup
     super
 
-    @lockdiscovery = <<EOS
-  <?xml version="1.0" encoding="utf-8" ?> 
-  <D:prop xmlns:D="DAV:"> 
-    <D:lockdiscovery> 
-      <D:activelock> 
-        <D:locktype><D:write/></D:locktype> 
-        <D:lockscope><D:exclusive/></D:lockscope> 
-        <D:depth>infinity</D:depth> 
-        <D:owner> 
-          <D:href>http://example.org/~ejw/contact.html</D:href> 
-        </D:owner> 
-        <D:timeout>Second-604800</D:timeout> 
-        <D:locktoken> 
-          <D:href
-          >urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4</D:href>
-        </D:locktoken> 
-        <D:lockroot> 
-          <D:href
-          >http://example.com/workspace/webdav/proposal.doc</D:href>
-        </D:lockroot> 
-      </D:activelock> 
-    </D:lockdiscovery> 
-  </D:prop> 
-EOS
-
-    # This one is missing D:locktype, a required element
-    @bad_lockdiscovery = <<EOS
-  <?xml version="1.0" encoding="utf-8" ?> 
-  <D:prop xmlns:D="DAV:"> 
-    <D:lockdiscovery> 
-      <D:activelock> 
-        <D:lockscope><D:exclusive/></D:lockscope> 
-        <D:depth>infinity</D:depth> 
-        <D:owner> 
-          <D:href>http://example.org/~ejw/contact.html</D:href> 
-        </D:owner> 
-        <D:timeout>Second-604800</D:timeout> 
-        <D:locktoken> 
-          <D:href
-          >urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4</D:href>
-        </D:locktoken> 
-        <D:lockroot> 
-          <D:href
-          >http://example.com/workspace/webdav/proposal.doc</D:href>
-        </D:lockroot> 
-      </D:activelock> 
-    </D:lockdiscovery> 
-  </D:prop> 
-EOS
-
     acl_str = <<EOS
 <D:acl xmlns:D='DAV:'> 
   <D:ace> 
@@ -243,6 +193,10 @@ EOS
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
     @getcontentlength_pk = RubyDav::PropKey.get 'DAV:', 'getcontentlength'
     @resourcetype_pk = RubyDav::PropKey.get 'DAV:', 'resourcetype'
+  end
+
+  def body_root_element body
+    return REXML::Document.new(body).root
   end
   
 end

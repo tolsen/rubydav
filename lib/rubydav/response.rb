@@ -1,7 +1,7 @@
 require File.dirname(__FILE__) + '/acl'
 require File.dirname(__FILE__) + '/dav_error'
 require File.dirname(__FILE__) + '/errors'
-require File.dirname(__FILE__) + '/lock_info'
+require File.dirname(__FILE__) + '/lock_discovery'
 require File.dirname(__FILE__) + '/rexml_fixes'
 require File.dirname(__FILE__) + '/utility'
 
@@ -162,22 +162,24 @@ module RubyDav
   class OkLockResponse < OkResponse #:nodoc:
     # returns the lock discovery info inside the response body of a successful
     # lock request
-    #
-    # lockinfo contains locktype, lockscope, depth, owner, timeout and
-    # locktoken
-    attr_reader :lockinfo
+
+    attr_reader :lock_discovery
 
     class << self
       
       def create(url, status, headers, body, method)
-        lockinfo = parse_body(body)
-        lockinfo.root = url
-        self.new(url, status, headers, body, lockinfo)
+        lock_discovery = parse_body(body)
+        lock_discovery.locks[0].root = url if
+          lock_discovery.locks.size == 1
+
+        self.new(url, status, headers, body, lock_discovery)
       end
 
       def parse_body(body)
         root = REXML::Document.new(body).root
-        return RubyDav::LockInfo.from_prop_element root
+        ld_elem = RubyDav.xpath_first root, '/prop/lockdiscovery'
+        raise BadResponseError if ld_elem.nil?
+        return RubyDav::LockDiscovery.from_elem(ld_elem)
       rescue ArgumentError
         raise BadResponseError
       end
@@ -186,8 +188,8 @@ module RubyDav
     
 
     private
-    def initialize(url, status, headers, body, lockinfo)
-      @lockinfo = lockinfo
+    def initialize(url, status, headers, body, lock_discovery)
+      @lock_discovery = lock_discovery
       super(url, status, headers, body)
     end
   end

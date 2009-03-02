@@ -67,6 +67,69 @@ class ErrorResponseTest < Test::Unit::TestCase
   end
 end
 
+class OkLockResponseTest < Test::Unit::TestCase
+  def setup
+    @body = <<EOS
+<?xml version="1.0" encoding="utf-8" ?> 
+<D:prop xmlns:D="DAV:"> 
+  <D:lockdiscovery> 
+    <D:activelock> 
+      <D:locktype><D:write/></D:locktype> 
+      <D:lockscope><D:exclusive/></D:lockscope> 
+      <D:depth>infinity</D:depth> 
+      <D:owner> 
+        <D:href>http://example.org/~ejw/contact.html</D:href> 
+      </D:owner> 
+      <D:timeout>Second-604800</D:timeout> 
+      <D:locktoken> 
+        <D:href
+        >urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4</D:href> 
+      </D:locktoken> 
+      <D:lockroot> 
+        <D:href
+        >http://example.com/workspace/webdav/proposal.doc</D:href> 
+      </D:lockroot> 
+    </D:activelock> 
+  </D:lockdiscovery> 
+</D:prop>
+EOS
+
+  end
+
+  def test_create
+    response = RubyDav::OkLockResponse.create('www.example.org', '200',
+                                              {}, @body, :lock)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_instance_of RubyDav::LockDiscovery, response.lock_discovery
+    assert_equal 'www.example.org', response.lock_discovery.locks[0].root
+  end
+
+  def test_initialize
+    response = RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
+                                            {}, @body, :lock_discovery)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_equal :lock_discovery, response.lock_discovery
+  end
+  
+  def test_parse_body
+    lock_discovery = RubyDav::OkLockResponse.parse_body @body
+    assert_instance_of RubyDav::LockDiscovery, lock_discovery
+  end
+
+  @@bad_bodies = {
+    :prop => '<notprop/>',
+    :lock_discovery =>
+    "<D:prop xmlns:D='DAV:'><notlockdiscovery/></D:prop>",
+  }
+
+  @@bad_bodies.each do |k, v|
+    define_method "test_parse_body__bad_#{k}" do
+      assert_raises(RubyDav::BadResponseError) { RubyDav::OkLockResponse.parse_body v }
+    end
+  end
+
+end
+
 class OkResponseTest < Test::Unit::TestCase
   def setup
     @body = "test body"

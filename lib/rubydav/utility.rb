@@ -1,4 +1,5 @@
 require 'rexml/document'
+require 'stringio'
 require 'uri'
 
 require File.dirname(__FILE__) + '/errors'
@@ -58,6 +59,19 @@ module RubyDav
       namespaces = { '' => 'DAV:' }.merge namespaces
       return REXML::XPath.match elem, path, namespaces
     end
+
+    def assert_elem_name elem, name, namespace = 'DAV:'
+      raise ArgumentError unless
+        elem.namespace == namespace && elem.name == name
+    end
+
+    def build_xml_stream &block
+      requestbody = String.new
+      xml = RubyDav::XmlBuilder.generate requestbody
+      yield xml
+      return StringIO.new(requestbody)
+    end
+    
   end
 
 end
