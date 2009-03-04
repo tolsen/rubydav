@@ -1,6 +1,7 @@
 require 'set'
 
 require File.dirname(__FILE__) + '/prop_key'
+require File.dirname(__FILE__) + '/property_result'
 require File.dirname(__FILE__) + '/utility'
 
 module RubyDav
@@ -234,6 +235,8 @@ module RubyDav
       end
       
     end
+
+    PropertyResult.define_class_reader :acl, self, 'acl'
     
   end
 end

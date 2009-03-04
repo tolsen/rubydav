@@ -169,12 +169,10 @@ class WebDavAclTest < Test::Unit::TestCase
     new_file 'file'
 
     # get a lock on the file
-    response = @request.lock('file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'file'
 
     # try unlocking
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     # Must have failed with 403
     assert_equal '403', response.status
 
@@ -187,7 +185,7 @@ class WebDavAclTest < Test::Unit::TestCase
       acl << RubyDav::Ace.new(:deny, test_principal_uri, false, :all)
       acl << RubyDav::Ace.new(:grant, test_principal_uri, false, :unlock)
     end
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     assert_equal '403', response.status
     
     # correct the acl order and retry
@@ -195,7 +193,7 @@ class WebDavAclTest < Test::Unit::TestCase
       acl.reverse!
     end
 
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     assert_equal '204', response.status
 
     # cleanup

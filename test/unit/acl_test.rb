@@ -411,6 +411,30 @@ end
 class AclTest < RubyDavUnitTestCase
   def setup
     super
+
+    acl_str = <<EOS
+<D:acl xmlns:D='DAV:'> 
+  <D:ace> 
+    <D:principal> 
+      <D:href
+      >http://www.example.com/acl/groups/maintainers</D:href> 
+    </D:principal>  
+    <D:grant> 
+      <D:privilege><D:write/></D:privilege> 
+    </D:grant> 
+  </D:ace> 
+  <D:ace> 
+    <D:principal> 
+      <D:all/> 
+    </D:principal> 
+    <D:grant> 
+      <D:privilege><D:read/></D:privilege>  
+    </D:grant> 
+  </D:ace> 
+</D:acl> 
+EOS
+    @acl_elem = REXML::Document.new(acl_str).root
+    
     @acl = RubyDav::Acl.new
     @ace = RubyDav::Ace.new :grant, :all, true, "read-acl"
     @iace = RubyDav::InheritedAce.new "http://www.example.org", :grant, :all, true, "read-acl"
@@ -520,6 +544,32 @@ class AclTest < RubyDavUnitTestCase
     assert_equal [@read_priv, @read_acl_priv], @acl[0].privileges
   end
   
+  def test_printXML
+    expected_body = create_acl_xml [:all, :grant, ["read-acl"], false, true]
+    @acl.unshift @ace
+    acl_xml = String.new
+    xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
+    @acl.printXML xml
+    assert (normalized_rexml_equal expected_body, acl_xml)
+  end
+  
+  def test_printXML2
+    expected_body = create_acl_xml([:all, :grant, ["read-acl"], true, true], 
+                                   [:all, :grant, ["read-acl"], false, true])
+    @acl.unshift @ace
+    @acl.unshift @iace
+    acl_xml = String.new
+    xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
+    @acl.printXML xml
+    assert (normalized_rexml_equal expected_body, acl_xml)
+  end
+
+  def test_property_result_class_reader
+    acl_result = RubyDav::PropertyResult.new @acl_pk, '200', @acl_elem
+    assert_instance_of RubyDav::Acl, acl_result.acl
+  end
+    
+
   def test_unshift_with_compacting_true_and_inherited_ace
     @acl.compacting= true
     @acl.unshift @ace
@@ -540,26 +590,6 @@ class AclTest < RubyDavUnitTestCase
     assert_equal 2, @acl.size
     assert_equal [@read_priv], @acl[0].privileges
     assert_equal [@read_acl_priv], @acl[1].privileges
-  end
-
-  def test_printXML
-    expected_body = create_acl_xml [:all, :grant, ["read-acl"], false, true]
-    @acl.unshift @ace
-    acl_xml = String.new
-    xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
-    @acl.printXML xml
-    assert (normalized_rexml_equal expected_body, acl_xml)
-  end
-  
-  def test_printXML2
-    expected_body = create_acl_xml([:all, :grant, ["read-acl"], true, true], 
-                                   [:all, :grant, ["read-acl"], false, true])
-    @acl.unshift @ace
-    @acl.unshift @iace
-    acl_xml = String.new
-    xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
-    @acl.printXML xml
-    assert (normalized_rexml_equal expected_body, acl_xml)
   end
 
 end

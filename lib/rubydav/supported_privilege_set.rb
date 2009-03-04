@@ -1,3 +1,4 @@
+require File.dirname(__FILE__) + '/property_result'
 
 module RubyDav
 
@@ -30,6 +31,8 @@ module RubyDav
       end
 
     end
+
+    PropertyResult.define_class_reader(:supported_privilege_set, self, 'supported-privilege-set')
 
   end
 
@@ -74,5 +77,6 @@ module RubyDav
     end
 
   end
+  
 end
 

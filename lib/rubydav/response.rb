@@ -163,16 +163,21 @@ module RubyDav
     # returns the lock discovery info inside the response body of a successful
     # lock request
 
-    attr_reader :lock_discovery
+    attr_reader :lock_discovery, :lock_token
+
+    # returns ActiveLock object for this request
+    def active_lock
+      return @lock_discovery.locks[@lock_token]
+    end
 
     class << self
       
       def create(url, status, headers, body, method)
         lock_discovery = parse_body(body)
-        lock_discovery.locks[0].root = url if
-          lock_discovery.locks.size == 1
 
-        self.new(url, status, headers, body, lock_discovery)
+        response = new url, status, headers, body, lock_discovery
+        response.active_lock.root = url
+        return response
       end
 
       def parse_body(body)
@@ -186,10 +191,14 @@ module RubyDav
 
     end
     
-
     private
+
     def initialize(url, status, headers, body, lock_discovery)
       @lock_discovery = lock_discovery
+      lt_hdr_vals = headers['lock-token']
+      raise BadResponseError unless
+        lt_hdr_vals.is_a?(Array) && lt_hdr_vals.size == 1
+      @lock_token = lt_hdr_vals[0].sub /^\s*<(.*)>\s*$/, '\1'
       super(url, status, headers, body)
     end
   end

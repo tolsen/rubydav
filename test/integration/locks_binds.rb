@@ -68,11 +68,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.bind('col', 'file2', 'col/file')
     assert_equal '201', response.status
 
-    response = @request.lock('col/file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'col/file'
     
-    response = @request.unlock('col/file2', lockinfo.token)
+    response = @request.unlock('col/file2', lock.token)
     assert_equal '204', response.status
 
     response = @request.delete 'col'
@@ -83,14 +81,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     setup_test_scenario_1
 
     # create a lock and try to remove a bind along it's lockroot
-    response = @request.lock('dstcol/file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'dstcol/file'
 
     response = @request.copy('srccol', 'dstcol', RubyDav::INFINITY, true)
     assert_equal '423', response.status
 
-    ifhdr = { 'dstcol/file' => lockinfo.token }
+    ifhdr = { 'dstcol/file' => lock.token }
     response = @request.copy('srccol', 'dstcol', RubyDav::INFINITY, true,
                              :if => ifhdr)
     assert_equal '204', response.status
@@ -104,7 +100,7 @@ class WebDavLocksTest < Test::Unit::TestCase
                             :if => ifhdr)
     assert_equal '204', response.status
 
-    response = @request.unlock('dstcol/file', lockinfo.token)
+    response = @request.unlock('dstcol/file', lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_1
@@ -119,22 +115,20 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('srccol/subcol/file', StringIO.new("srccol_subcol_file"))
     assert_equal '201', response.status
 
-    response = @request.lock('dstcol/subcol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'dstcol/subcol'
 
     response = @request.copy('srccol', 'dstcol', RubyDav::INFINITY, true)
     assert_equal '423', response.status
 
     response = @request.copy('srccol', 'dstcol', RubyDav::INFINITY, true,
-                             :if => { 'dstcol/subcol' => lockinfo.token })
+                             :if => { 'dstcol/subcol' => lock.token })
     assert_equal '204', response.status
 
     
     response = @request.delete('dstcol/subcol/file')
     assert_equal '423', response.status
 
-    response = @request.unlock('dstcol/subcol', lockinfo.token)
+    response = @request.unlock('dstcol/subcol', lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_1
@@ -149,15 +143,10 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('srcfile', StringIO.new("src file"))
     assert_equal '201', response.status
     
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
-    response = @request.lock('dstfile', lockinfo)
-    assert_equal '200', response.status
-    sl1 = response.lockinfo
+    sl1 = lock 'dstfile', :scope => :shared, :depth => 0
     ifhdr1 = { 'dstfile' => sl1.token }
 
-    response = @request.lock('dstfile', lockinfo)
-    assert_equal '200', response.status
-    sl2 = response.lockinfo
+    sl2 = lock 'dstfile', :scope => :shared, :depth => 0
     ifhdr2 = { 'dstfile' => sl2.token }
 
     response = @request.copy('srcfile', 'dstfile', 0, true,
@@ -194,13 +183,8 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_x_depth_inf_lock_clash_after_bind
     setup_test_scenario_2
 
-    response = @request.lock('dstcol/subcol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
-
-    response = @request.lock('dstcol/subcol2', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo2 = response.lockinfo
+    lock = lock 'dstcol/subcol'
+    lock2 = lock 'dstcol/subcol2'
 
     response = @request.bind('', 'dstcol', 'srccol', :overwrite => true)
     assert_equal '423', response.status
@@ -208,16 +192,16 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.bind('', 'dstcol', 'srccol',
                              :overwrite => true,
                              :if => {
-                               lockinfo.root => lockinfo.token,
-                               lockinfo2.root => lockinfo2.token
+                               lock.root => lock.token,
+                               lock2.root => lock2.token
                              })
     
     assert_equal '409', response.status
 
-    response = @request.unlock('dstcol/subcol', lockinfo.token)
+    response = @request.unlock('dstcol/subcol', lock.token)
     assert_equal '204', response.status
 
-    response = @request.unlock('dstcol/subcol2', lockinfo2.token)
+    response = @request.unlock('dstcol/subcol2', lock2.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_2
@@ -226,16 +210,12 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_s_depth_inf_lock_after_bind
     setup_test_scenario_2
 
-    response = @request.lock('dstcol/subcol', RubyDav::LockInfo.new(:scope => :shared))
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'dstcol/subcol', :scope => :shared
+    lock2 = lock 'dstcol/subcol2', :scope => :shared
 
-    response = @request.lock('dstcol/subcol2', RubyDav::LockInfo.new(:scope => :shared))
-    assert_equal '200', response.status
-    lockinfo2 = response.lockinfo
     ifhdr = {
-      lockinfo.root => lockinfo.token,
-      lockinfo2.root => lockinfo2.token
+      lock.root => lock.token,
+      lock2.root => lock2.token
     }
 
     response = @request.bind('', 'dstcol', 'srccol', :overwrite => true)
@@ -256,10 +236,10 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('dstcol/subcol2/subsubcol')
     assert_equal '423', response.status
 
-    response = @request.unlock('dstcol/subcol', lockinfo.token)
+    response = @request.unlock('dstcol/subcol', lock.token)
     assert_equal '204', response.status
 
-    response = @request.unlock('dstcol/subcol2', lockinfo2.token)
+    response = @request.unlock('dstcol/subcol2', lock2.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_2
@@ -283,22 +263,20 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.bind('CollW/CollY', 'CollZ', 'CollW')
     assert_equal '201', response.status
 
-    response = @request.lock('CollW', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'CollW'
     
     response = @request.rebind('CollW/CollX', 'CollA', 'CollW/CollY/CollZ')
     assert_equal '423', response.status
 
     response = @request.rebind('CollW/CollX', 'CollA', 'CollW/CollY/CollZ',
-                               :if => lockinfo.token)
+                               :if => lock.token)
     assert_equal '201', response.status
 
     # verify that the lock is still present
     response = @request.mkcol('CollW/testcol')
     assert_equal '423', response.status
 
-    response = @request.delete('CollW', :if => lockinfo.token)
+    response = @request.delete('CollW', :if => lock.token)
     assert_equal '204', response.status
   end
 
@@ -308,26 +286,11 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.mkcol('srccol/subcol')
     assert_equal '201', response.status
     
-    locks = Array.new
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
-
-    response = @request.lock('srccol', lockinfo)
-    assert_equal '200', response.status
-    locks << response.lockinfo
+    locks = [ lock('srccol', :scope => :shared, :depth => 0),
+              lock('srccol/file', :scope => :shared, :depth => 0),
+              lock('srccol/subcol', :scope => :shared, :depth => 0),
+              lock('srccol', :scope => :shared, :depth => RubyDav::INFINITY) ]
     
-    response = @request.lock('srccol/file', lockinfo.clone)
-    assert_equal '200', response.status
-    locks << response.lockinfo
-
-    response = @request.lock('srccol/subcol', lockinfo)
-    assert_equal '200', response.status
-    locks << response.lockinfo
-
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => RubyDav::INFINITY)
-    response = @request.lock('srccol', lockinfo)
-    assert_equal '200', response.status
-    locks << response.lockinfo
-
     response = @request.unbind('', 'srccol')
     # we don't provide some locks on children and some on the collection itself. the response is sometimes
     # 423 and sometimes 207 depending on the order in which the locks are retreived from the database when checking
@@ -360,19 +323,15 @@ class WebDavLocksTest < Test::Unit::TestCase
     setup_test_scenario_1
 
     # lock the dstcol. we'll bind srccol into this
-    response = @request.lock('dstcol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'dstcol'
 
     # we'll first have a conflicting lock on srccol and verify failure
-    response = @request.lock('srccol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lock_that_will_conflict = response.lockinfo
+    lock_that_will_conflict = lock 'srccol'
 
     response = @request.bind('dstcol', 'srccol', 'srccol')
     assert_equal '423', response.status
 
-    ifhdr = { 'dstcol' => lockinfo.token }
+    ifhdr = { 'dstcol' => lock.token }
     response = @request.bind('dstcol', 'srccol', 'srccol', :if => ifhdr)
     assert_equal '409', response.status
 
@@ -410,7 +369,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unbind('dstcol', 'srccol')
     assert_equal '423', response.status
 
-    response = @request.unlock('dstcol', lockinfo.token)
+    response = @request.unlock('dstcol', lock.token)
     assert_equal '204', response.status
 
     response = @request.unbind('dstcol', 'srccol')
@@ -425,10 +384,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('srccol/subcol/file', StringIO.new("srccol_subcol_file"))
     assert_equal '201', response.status
 
-    response = @request.lock('srccol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    srccol_lockinfo = response.lockinfo
-    ifhdr = { 'srccol' => srccol_lockinfo.token }
+    srccol_lock = lock 'srccol'
+    ifhdr = { 'srccol' => srccol_lock.token }
 
     response = @request.bind('srccol/subcol2', 'file', 'srccol/subcol/file')
     assert_equal '423', response.status
@@ -451,7 +408,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
 
     # for a change, try unlocking through a child
-    response = @request.unlock('srccol/subcol2', srccol_lockinfo.token)
+    response = @request.unlock('srccol/subcol2', srccol_lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_2
@@ -460,9 +417,8 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_bind_to_ancestor_of_depth_inf_locked_collection_into_collection
     setup_test_scenario_1
 
-    response = @request.lock('dstcol/subcol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    ifhdr = { 'dstcol/subcol' => response.lockinfo.token }
+    lock = lock 'dstcol/subcol'
+    ifhdr = { 'dstcol/subcol' => lock.token }
 
     response = @request.bind('dstcol/subcol', 'anc', 'dstcol')
     assert_equal '423', response.status
@@ -477,7 +433,7 @@ class WebDavLocksTest < Test::Unit::TestCase
                             :if => ifhdr)
     assert_equal '204', response.status
 
-    response = @request.lock('dstcol', RubyDav::LockInfo.new)
+    response = @request.lock 'dstcol'
     assert_equal '423', response.status
 
     response = @request.unbind('dstcol', 'subcol')
@@ -495,14 +451,11 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_bind_to_shared_locked_ancestor_of_shared_depth_inf_locked_collection_into_collection
     setup_test_scenario_1
 
-    response = @request.lock('dstcol', RubyDav::LockInfo.new(:scope => :shared))
-    assert_equal '200', response.status
-    dstcol_lockinfo = response.lockinfo
-    ifhdr_dstcol = { 'dstcol' => dstcol_lockinfo.token }
+    dstcol_lock = lock 'dstcol', :scope => :shared
+    ifhdr_dstcol = { 'dstcol' => dstcol_lock.token }
 
-    response = @request.lock('dstcol/subcol', RubyDav::LockInfo.new(:scope => :shared))
-    assert_equal '200', response.status
-    ifhdr = { 'dstcol/subcol' => response.lockinfo.token }
+    subcol_lock = lock 'dstcol/subcol', :scope => :shared
+    ifhdr = { 'dstcol/subcol' => subcol_lock.token }
 
     response = @request.bind('dstcol/subcol', 'anc', 'dstcol')
     assert_equal '423', response.status
@@ -520,7 +473,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('dstcol/file', StringIO.new("another dstcol_file"),
                             :if => ifhdr_dstcol)
 
-    response = @request.lock('dstcol', RubyDav::LockInfo.new)
+    response = @request.lock 'dstcol'
     assert_equal '423', response.status
 
     response = @request.unbind('dstcol', 'subcol')
@@ -538,7 +491,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.mkcol('dstcol/subcol', :if => ifhdr_dstcol)
     assert_equal '201', response.status
 
-    response = @request.unlock('dstcol', dstcol_lockinfo.token)
+    response = @request.unlock('dstcol', dstcol_lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_1
@@ -547,10 +500,8 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_rebind_collection_in_place_of_locked_parent
     setup_test_scenario_2
 
-    response = @request.lock('srccol', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    srccol_lockinfo = response.lockinfo
-    ifhdr = { 'srccol' => srccol_lockinfo.token }
+    srccol_lock = lock 'srccol'
+    ifhdr = { 'srccol' => srccol_lock.token }
 
     response = @request.rebind('', 'srccol', 'srccol/subcol/subsubcol',
                                :if => ifhdr, :overwrite => true)
@@ -563,7 +514,7 @@ class WebDavLocksTest < Test::Unit::TestCase
                             :if => ifhdr)
     assert_equal '201', response.status
 
-    response = @request.unlock('srccol', srccol_lockinfo.token)
+    response = @request.unlock('srccol', srccol_lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_2
@@ -575,10 +526,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.propfind('srccol/file', 0, :"resource-id")
     srccol_file_uuid = response[:"resource-id"]
 
-    response = @request.lock('dstcol/file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
-    ifhdr = { 'dstcol/file' => lockinfo.token }
+    lock = lock 'dstcol/file'
+    ifhdr = { 'dstcol/file' => lock.token }
 
     response = @request.bind('dstcol', "file", 'srccol/file', :overwrite => true)
     assert_equal '423', response.status
@@ -613,7 +562,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # assert_equal '424', response.status
 
     # unlock the resource with lockroot dstcol_file using its srccol_file uri
-    response = @request.unlock('srccol/file', lockinfo.token)
+    response = @request.unlock('srccol/file', lock.token)
     assert_equal '204', response.status
 
     cleanup_test_scenario_1

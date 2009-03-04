@@ -10,6 +10,9 @@ class SupportedPrivilegeTest < RubyDavUnitTestCase
     
   def setup
     super
+    @supported_privilege_elem =
+      RubyDav::xpath_first @supported_privilege_set_elem, 'supported-privilege'
+
     @write_content_spriv =
       RubyDav::SupportedPrivilege.new @write_content_priv, 'write content', 'en'
     @write_properties_spriv =
@@ -129,6 +132,14 @@ class SupportedPrivilegeSetTest < RubyDavUnitTestCase
   def test_initialize
     set = RubyDav::SupportedPrivilegeSet.new :priv1, :priv2
     assert_equal [:priv1, :priv2], set.supported_privileges
+  end
+
+  def test_property_result_class_reader
+    sps_pk = RubyDav::PropKey.get 'DAV:', 'supported-privilege-set'
+    sps_result = RubyDav::PropertyResult.new(sps_pk, '200',
+                                             @supported_privilege_set_elem)
+    assert_instance_of(RubyDav::SupportedPrivilegeSet,
+                       sps_result.supported_privilege_set)
   end
 
 end

@@ -1,5 +1,3 @@
-require File.dirname(__FILE__) + '/acl'
-require File.dirname(__FILE__) + '/current_user_privilege_set'
 require File.dirname(__FILE__) + '/prop_key'
 
 
@@ -8,18 +6,6 @@ module RubyDav
   class PropertyResult
 
     attr_reader :prop_key, :status, :element, :error
-
-    def acl
-      return nil if prop_key != PropKey.get('DAV:', 'acl')
-      return Acl.from_elem(element)
-    end
-
-    def current_user_privilege_set
-      return nil if prop_key != PropKey.get('DAV:', 'current-user-privilege-set')
-      return CurrentUserPrivilegeSet.from_elem(element)
-    end
-
-    alias cups current_user_privilege_set
 
     def eql? other
       other.instance_of?(PropertyResult) &&
@@ -46,14 +32,20 @@ module RubyDav
       status == '200'
     end
 
-    def supported_privilege_set
-      return nil if prop_key != PropKey.get('DAV:', 'supported-privilege-set')
-      return SupportedPrivilegeSet.from_elem(element)
-    end
-
     def value
       element.nil? ? nil : element.to_s_with_ns
     end
+
+    class << self
+
+      def define_class_reader method_name, klass, prop_name, namespace = 'DAV:'
+        define_method method_name do
+          next nil if prop_key != PropKey.get(namespace, prop_name)
+          next klass.from_elem(element)
+        end
+      end
+    end
+    
 
   end
 

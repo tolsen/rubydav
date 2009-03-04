@@ -16,13 +16,16 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
   $:.unshift File.join(File.dirname(__FILE__), '../../better_httpauth/lib')
 
+  require File.dirname(__FILE__) + '/rubydav/acl'
   require File.dirname(__FILE__) + '/rubydav/auth'
   require File.dirname(__FILE__) + '/rubydav/auth_world'
+  require File.dirname(__FILE__) + '/rubydav/active_lock'
   require File.dirname(__FILE__) + '/rubydav/connection_pool'
   require File.dirname(__FILE__) + '/rubydav/current_user_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/file_fixes'
   require File.dirname(__FILE__) + '/rubydav/http_fixes'
   require File.dirname(__FILE__) + '/rubydav/if_header'
+  require File.dirname(__FILE__) + '/rubydav/lock_discovery'
   require File.dirname(__FILE__) + '/rubydav/property_result'
   require File.dirname(__FILE__) + '/rubydav/response'
   require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
@@ -541,12 +544,16 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :move, srcurl, nil, options
       end
 
-      def lock url, scope = :exclusive, owner = "", type = :write, options={}
+      # options: scope, owner, type, depth, timeout
+      def lock url, options={}
+        scope = options[:scope] || :exclusive
+        type = options[:type] || :write
+
         stream = RubyDav.build_xml_stream do |xml|
           xml.lockinfo 'xmlns' => 'DAV:' do
             xml.locktype { xml.tag! type }
             xml.lockscope { xml.tag! scope }
-            xml.owner { xml << owner }
+            xml.owner { xml << options[:owner] } if options.include? :owner
           end
         end
 

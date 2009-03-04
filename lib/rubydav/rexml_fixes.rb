@@ -33,7 +33,8 @@ module REXML
         if copy.namespaces.is_a? Hash
           
           copy.namespaces.each_pair do |k, v|
-            copy.add_namespace k, v
+            args = k == 'xmlns' ? [v] : [k, v]
+            copy.add_namespace *args
           end
 
         else

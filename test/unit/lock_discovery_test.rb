@@ -42,21 +42,30 @@ class LockDiscoveryTest < RubyDavUnitTestCase
  </D:activelock> 
 </D:lockdiscovery>
 EOS
+    @lock1 = flexmock 'lock1', :token => 'token1'
+    @lock2 = flexmock 'lock2', :token => 'token2'
 
-    @lock_discovery = RubyDav::LockDiscovery.new :lock1, :lock2
+    @lock_discovery = RubyDav::LockDiscovery.new @lock1, @lock2
+    @lock_discovery_elem = body_root_element @lockdiscovery_str
   end
 
   def test_from_elem
-    elem = body_root_element @lockdiscovery_str
-    lock_discovery = RubyDav::LockDiscovery.from_elem elem
-    lock_discovery.locks.each do |l|
+    lock_discovery = RubyDav::LockDiscovery.from_elem @lock_discovery_elem
+    lock_discovery.locks.each_value do |l|
       assert_instance_of RubyDav::ActiveLock, l
     end
   end
 
   def test_initialize
     assert_instance_of RubyDav::LockDiscovery, @lock_discovery
-    assert_equal [:lock1, :lock2], @lock_discovery.locks
+    expected_locks = { 'token1' => @lock1, 'token2' => @lock2 }
+    assert_equal expected_locks, @lock_discovery.locks
+  end
+
+  def test_property_result_class_reader
+    ld_pk = RubyDav::PropKey.get 'DAV:', 'lockdiscovery'
+    result = RubyDav::PropertyResult.new ld_pk, '200', @lock_discovery_elem
+    assert_instance_of RubyDav::LockDiscovery, result.lockdiscovery
   end
   
 end

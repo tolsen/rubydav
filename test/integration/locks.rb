@@ -17,16 +17,13 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     # get an exclusive write lock
     owner = "<D:href xmlns:D='DAV:'>http://tim.limebits.com/</D:href>"
-    lockinfo = RubyDav::LockInfo.new(:depth => 0, :owner => owner)
-    response = @request.lock('file', lockinfo)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'file', :depth => 0, :owner => owner
 
-    assert_equal :write, lockinfo.type
-    assert_equal :exclusive, lockinfo.scope
-    assert_equal 0, lockinfo.depth
+    assert_equal :write, lock.type
+    assert_equal :exclusive, lock.scope
+    assert_equal 0, lock.depth
 
-    assert_xml_matches lockinfo.owner do |xml|
+    assert_xml_matches lock.owner do |xml|
       xml.xmlns! :D => "DAV:"
       xml.D :href, 'http://tim.limebits.com/'
     end
@@ -38,7 +35,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('file')
     assert_equal '423', response.status
 
-    response = @request.unlock('file', lockinfo.token)
+    response = @request.unlock('file', lock.token)
     assert_equal '204', response.status
 
     response = @request.delete('file')
@@ -48,17 +45,13 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_put_on_locknull
     response = @request.delete('locknull')
 
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
+    lock = lock 'locknull', :depth => 0
 
-    lockinfo = response.lockinfo
-
-    if_hdr = { 'locknull' => lockinfo.token }
+    if_hdr = { 'locknull' => lock.token }
     response = @request.put('locknull', StringIO.new("test"), :if => if_hdr)
     assert_equal '201', response.status
 
-    response = @request.unlock('locknull', lockinfo.token)
+    response = @request.unlock('locknull', lock.token)
     assert_equal '204', response.status
 
     response = @request.get('locknull')
@@ -74,22 +67,17 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('coll')
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('coll', lockinfo)
-    assert_equal '200', response.status
+    lock = lock 'coll', :depth => 0
 
     # repeat the above operation and assert that it fails with 423 #8.10.7
     # try lock refresh with wrong token and assert failure with 413 #8.10.7
-
-    # store the lock token returned by the server
-    lockinfo = response.lockinfo
 
     # check that lock-null can't be overwritten without providing locktoken
     response = @request.mkcol('coll')
     assert_equal '423', response.status
 
     # provide locktoken and try again
-    if_hdr = { 'coll' => lockinfo.token }
+    if_hdr = { 'coll' => lock.token }
     response = @request.mkcol('coll', :if => if_hdr)
     assert_equal '201', response.status
 
@@ -111,17 +99,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('locknull')
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
-
-    # store the lock token returned by the server
-    lockinfo = response.lockinfo
+    lock = lock 'locknull', :depth => 0
 
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_not_nil response["#{@uri.path}locknull"]
 
-    response = @request.unlock('locknull', lockinfo.token)
+    response = @request.unlock('locknull', lock.token)
     assert_equal '204', response.status
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
@@ -134,31 +117,23 @@ class WebDavLocksTest < Test::Unit::TestCase
     # ensure that locknull file doesn't exist
     response = @request.delete('locknull')
 
-    # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
-
-    # store the lock token returned by the server
-    lockinfo1 = response.lockinfo
+    # create a shared write locked null resource
+    lock1 = lock 'locknull', :scope => :shared, :depth => 0
 
     # get another shared lock
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
+    lock2 = lock 'locknull', :scope => :shared, :depth => 0
 
-    lockinfo2 = response.lockinfo
-
-    response = @request.unlock('locknull', lockinfo2.token)
+    response = @request.unlock('locknull', lock2.token)
     assert_equal '204', response.status
 
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_not_nil response["#{@uri.path}locknull"]
 
     # assert that old locktoken doesn't work anymore
-    response = @request.unlock('locknull', lockinfo2.token)
+    response = @request.unlock('locknull', lock2.token)
     assert_equal '409', response.status # Sec 9.11.1 of draft 18
 
-    response = @request.unlock('locknull', lockinfo1.token)
+    response = @request.unlock('locknull', lock1.token)
     assert_equal '204', response.status
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
@@ -170,12 +145,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('locknull')
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
-
-    # store the lock token returned by the server
-    lockinfo = response.lockinfo
+    lock = lock 'locknull', :depth => 0
 
     response = @request.propfind('locknull', 0, :creationdate, :displayname, :resourcetype, :"resource-id")
     assert_equal '207', response.status
@@ -187,7 +157,7 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     assert locknull_response[:"resource-id"].inner_value.strip.length > 0
 
-    response = @request.unlock('locknull', lockinfo.token)
+    response = @request.unlock('locknull', lock.token)
     assert_equal '204', response.status
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
@@ -199,16 +169,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete('locknull')
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('locknull', lockinfo)
-    assert_equal '200', response.status
-
-    lockinfo = response.lockinfo
+    lock = lock 'locknull', :depth => 0
 
     response = @request.move('locknull', 'nulllock')
     assert_equal '404', response.status
 
-    response = @request.unlock('locknull', lockinfo.token)
+    response = @request.unlock('locknull', lock.token)
     assert_equal '204', response.status
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
@@ -220,9 +186,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete res_name
 
     # create a exclusive write locked null resource
-    lockinfo = RubyDav::LockInfo.new(:depth => 0, :timeout => 2)
-    response = @request.lock(res_name, lockinfo)
-    assert_equal '200', response.status
+    lock res_name, :depth => 0, :timeout => 2
 
     # wait for the lock to expire
     sleep 4
@@ -272,9 +236,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('coll/secret', StringIO.new("Investigate small file"), testcreds)
     assert_equal '403', response.status
 
-    # try and get a  lock on the collection
-    lockinfo = RubyDav::LockInfo.new
-    response = @request.lock('coll', lockinfo, testcreds)
+    # lock the collection
+    response = @request.lock 'coll', testcreds
     # assert multi-status with 424 for req-uri and 403 for troublesome child
     assert_equal '207', response.status
     resps = response.responses
@@ -299,18 +262,16 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('coll/file', @stream)
     assert_equal '201', response.status
 
-    response = @request.lock('coll/subcoll', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'coll/subcoll'
 
-    response = @request.lock('coll', RubyDav::LockInfo.new)
+    response = @request.lock 'coll'
     assert_equal '207', response.status
     resps = response.responses
     assert_equal '424', resps.detect{|resp| (@uri.path + 'coll') == resp.url}.status
     assert_equal '423', resps.detect{|resp| (@uri.path + 'coll/subcoll') == resp.url}.status
 
     response = @request.delete('coll', :depth => RubyDav::INFINITY,
-                               :if => { 'coll/subcoll' => lockinfo.token })
+                               :if => { 'coll/subcoll' => lock.token })
   end
 
   def test_double_shared_lock
@@ -318,14 +279,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('file', @stream)
     assert_equal '201', response.status
 
-    lockinfo = RubyDav::LockInfo.new(:scope => :shared, :depth => 0)
-    response = @request.lock('file', lockinfo)
-    assert_equal '200', response.status
-    shared_lock1 = response.lockinfo
+    shared_lock1 = lock 'file', :scope => :shared, :depth => 0
+    shared_lock2 = lock 'file', :scope => :shared, :depth => 0
 
-    response = @request.lock('file', lockinfo)
-    assert_equal '200', response.status
-    shared_lock2 = response.lockinfo
+    response = @request.propfind 'file', 0, :lockdiscovery
+    assert_equal([shared_lock1.token, shared_lock2.token].sort,
+                 response[:lockdiscovery].lockdiscovery.locks.keys.sort)
 
     response = @request.unlock('file', shared_lock2.token)
     assert_equal '204', response.status
@@ -345,14 +304,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('file', @stream)
     assert_equal '201', response.status
 
-    response = @request.lock('file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'file'
 
     response = @request.move('file', 'who-cares', false)
     assert_equal '423', response.status
 
-    response = @request.move('file', 'who-cares', false, :if => { 'file' => lockinfo.token })
+    response = @request.move('file', 'who-cares', false, :if => { 'file' => lock.token })
     assert_equal '201', response.status
 
     # cleanup
@@ -373,11 +330,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put(col_file, @stream)
     assert_equal '201', response.status
 
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock(col, lockinfo)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
-    assert_equal 0, lockinfo.depth
+    lock = lock col, :depth => 0
+    assert_equal 0, lock.depth
 
     response = @request.put(col_file, StringIO.new("Should succeed"))
     assert_equal '204', response.status
@@ -393,7 +347,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unbind('', "col")
     assert_equal '423', response.status
 
-    response = @request.unbind('', "col", :if => { col => lockinfo.token })
+    response = @request.unbind('', "col", :if => { col => lock.token })
     assert_equal '200', response.status
 
     response = @request.unbind('', "file")
@@ -411,22 +365,19 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '201', response.status
     orig_etag = response.headers['etag'][0]
 
-    lockinfo = RubyDav::LockInfo.new(:depth=>0)
-    response = @request.lock(file, lockinfo)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock file, :depth => 0
 
-    response = @request.put(file, StringIO.new("world"), :if => { file => lockinfo.token })
+    response = @request.put(file, StringIO.new("world"), :if => { file => lock.token })
     assert_equal '204', response.status
     new_etag = response.headers['etag'][0]
 
-    response = @request.delete(file, :if => [orig_etag, lockinfo.token])
+    response = @request.delete(file, :if => [orig_etag, lock.token])
     assert_equal '412', response.status
     
     response = @request.get(file)
     assert_equal '200', response.status
     
-    response = @request.delete(file, :if => [new_etag, lockinfo.token])
+    response = @request.delete(file, :if => [new_etag, lock.token])
     assert_equal '204', response.status
      
     response = @request.get(file)
@@ -477,24 +428,21 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_move_under_single_lock
     setup_hr
 
-    lockinfo = RubyDav::LockInfo.new(:depth => RubyDav::INFINITY)
-    response = @request.lock('httplock/hr', lockinfo)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'httplock/hr', :depth => RubyDav::INFINITY
 
     response = @request.move('httplock/hr/recruiting/resumes', 'httplock/hr/archives/resumes')
     assert_equal '423', response.status
     assert_exists 'httplock/hr/recruiting/resumes/'
     assert_does_not_exist 'httplock/hr/archives/resumes/'
 
-    if_hdr = lockinfo.token
+    if_hdr = lock.token
     response = @request.move('httplock/hr/recruiting/resumes', 'httplock/hr/archives/resumes', false, :if => if_hdr)
     assert_equal '201', response.status
     assert_does_not_exist 'httplock/hr/recruiting/resumes/'
     assert_exists 'httplock/hr/archives/resumes/'
 
     # cleanup
-    response = @request.unlock('httplock/hr', lockinfo.token)
+    response = @request.unlock('httplock/hr', lock.token)
     assert_equal '204', response.status
     delete_coll('httplock')
   end
@@ -504,13 +452,10 @@ class WebDavLocksTest < Test::Unit::TestCase
     setup_hr
     new_coll 'httplock/hr/archives/resumes'
 
-    lockinfo = RubyDav::LockInfo.new(:depth => RubyDav::INFINITY)
-    response = @request.lock('httplock/hr/recruiting/resumes', lockinfo)
-    assert_equal '200', response.status
-    resumes_locktoken = response.lockinfo.token
-    response = @request.lock('httplock/hr/archives', lockinfo)
-    assert_equal '200', response.status
-    archives_locktoken = response.lockinfo.token
+    resumes_locktoken = lock('httplock/hr/recruiting/resumes',
+                             :depth => RubyDav::INFINITY).token
+    archives_locktoken = lock('httplock/hr/archives',
+                              :depth => RubyDav::INFINITY).token
 
     assert_hr_move_response '423'
     assert_hr_move_response '423', resumes_locktoken 
@@ -531,24 +476,21 @@ class WebDavLocksTest < Test::Unit::TestCase
     setup_hr
     new_coll('httplock/hr/archives/resumes')
 
-    lockinfo = RubyDav::LockInfo.new(:depth => RubyDav::INFINITY)
-    response = @request.lock('httplock/hr/recruiting/resumes', lockinfo)
-    assert_equal '200', response.status
-    resumes_locktoken = response.lockinfo.token
-    response = @request.lock('httplock/hr/archives', lockinfo)
-    assert_equal '200', response.status
-    archives_locktoken = response.lockinfo.token
+    resumes_locktoken = lock('httplock/hr/recruiting/resumes',
+                             :depth => RubyDav::INFINITY).token
+    archives_locktoken = lock('httplock/hr/archives',
+                              :depth => RubyDav::INFINITY).token
 
     bad_if = {
-                'httplock/hr/recruiting/resumes/harry' => archives_locktoken,
-                'httplock/hr/archives/resumes' => resumes_locktoken
+      'httplock/hr/recruiting/resumes/harry' => archives_locktoken,
+      'httplock/hr/archives/resumes' => resumes_locktoken
     }
 
     assert_hr_move_response '412', bad_if
 
     good_if = {
-                'httplock/hr/recruiting/resumes/harry' => resumes_locktoken,
-                'httplock/hr/archives/resumes' => archives_locktoken
+      'httplock/hr/recruiting/resumes/harry' => resumes_locktoken,
+      'httplock/hr/archives/resumes' => archives_locktoken
     }
 
     assert_hr_move_response '201', good_if
@@ -565,11 +507,7 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_delete_with_child_locked
     setup_hr
     dicks_resume = 'httplock/hr/recruiting/resumes/dick'
-
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock(dicks_resume, lockinfo)
-    assert_equal '200', response.status
-    dicks_locktoken = response.lockinfo.token
+    dicks_locktoken = lock(dicks_resume, :depth => 0).token
 
     response = @request.delete('httplock/hr/recruiting/resumes')
     assert_equal '207', response.status
@@ -594,14 +532,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     new_file 'httplock/a', StringIO.new("hello")
     new_file 'httplock/b', StringIO.new("world")
 
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('httplock/b', lockinfo)
-    assert_equal '200', response.status
-    b_locktoken = response.lockinfo.token
-
-    response = @request.lock('httplock/a', lockinfo)
-    assert_equal '200', response.status
-    a_locktoken = response.lockinfo.token
+    b_locktoken = lock('httplock/b', :depth => 0).token
+    a_locktoken = lock('httplock/a', :depth => 0).token
 
     response = @request.put('httplock/a', StringIO.new('hello'), :if => [a_locktoken, b_locktoken])
     assert_equal '412', response.status
@@ -621,10 +553,8 @@ class WebDavLocksTest < Test::Unit::TestCase
   def test_put_new_resource_locked_collection_zero_depth
     setup_hr
 
-    lockinfo = RubyDav::LockInfo.new(:depth => 0)
-    response = @request.lock('httplock/hr/recruiting/resumes', lockinfo)
-    assert_equal '200', response.status
-    resumes_locktoken = response.lockinfo.token
+    resumes_locktoken = lock('httplock/hr/recruiting/resumes',
+                             :depth => 0).token
 
     response = @request.put('httplock/hr/recruiting/resumes/ldusseault.txt', StringIO.new("lisa resume"), :if_none_match => '*')
     assert_equal '423', response.status

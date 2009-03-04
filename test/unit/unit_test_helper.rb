@@ -79,38 +79,6 @@ EOS
   def setup
     super
 
-    acl_str = <<EOS
-<D:acl xmlns:D='DAV:'> 
-  <D:ace> 
-    <D:principal> 
-      <D:href
-      >http://www.example.com/acl/groups/maintainers</D:href> 
-    </D:principal>  
-    <D:grant> 
-      <D:privilege><D:write/></D:privilege> 
-    </D:grant> 
-  </D:ace> 
-  <D:ace> 
-    <D:principal> 
-      <D:all/> 
-    </D:principal> 
-    <D:grant> 
-      <D:privilege><D:read/></D:privilege>  
-    </D:grant> 
-  </D:ace> 
-</D:acl> 
-EOS
-
-    @acl_elem = REXML::Document.new(acl_str).root
-
-    cups_str = <<EOS
-<current-user-privilege-set xmlns='DAV:'> 
-  <privilege><read/></privilege> 
-  <privilege><write/></privilege> 
-</current-user-privilege-set>
-EOS
-    @cups_elem = REXML::Document.new(cups_str).root
-
     supported_privilege_set_str = <<EOS
 <D:supported-privilege-set xmlns:D='DAV:'>
   <D:supported-privilege>
@@ -176,8 +144,6 @@ EOS
 
     @supported_privilege_set_elem =
       REXML::Document.new(supported_privilege_set_str).root
-    @supported_privilege_elem =
-      RubyDav::xpath_first @supported_privilege_set_elem, 'supported-privilege'
 
     @all_priv = RubyDav::PropKey.get 'DAV:', 'all'
     @read_priv = RubyDav::PropKey.get 'DAV:', 'read'
@@ -190,6 +156,7 @@ EOS
     @write_properties_priv = RubyDav::PropKey.get 'DAV:', 'write-properties'
     @unlock_priv = RubyDav::PropKey.get 'DAV:', 'unlock'
 
+    @acl_pk = RubyDav::PropKey.get 'DAV:', 'acl'
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
     @getcontentlength_pk = RubyDav::PropKey.get 'DAV:', 'getcontentlength'
     @resourcetype_pk = RubyDav::PropKey.get 'DAV:', 'resourcetype'

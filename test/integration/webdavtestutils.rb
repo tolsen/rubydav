@@ -97,12 +97,13 @@ module WebDavTestUtils
     return response[:acl].acl.modifiable
   end
 
-  # lock resource and return lockinfo
-  def lock_resource(path, lockinfo=RubyDav::LockInfo.new, creds={})
-    response = @request.lock(path, lockinfo, creds)
+  # lock resource and return activelock
+  def lock path, options = {}
+    response = @request.lock path, options
     assert_equal '200', response.status
-    response.lockinfo
+    return response.active_lock
   end
+  
   
   def assert_dav_error(response_or_dav_error, condition)
     dav_error = if response_or_dav_error.kind_of?(RubyDav::Response)

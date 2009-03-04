@@ -93,22 +93,47 @@ class OkLockResponseTest < Test::Unit::TestCase
   </D:lockdiscovery> 
 </D:prop>
 EOS
+    @locktoken = 'urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4'
 
   end
 
   def test_create
     response = RubyDav::OkLockResponse.create('www.example.org', '200',
-                                              {}, @body, :lock)
+                                              { 'lock-token' =>
+                                                ["<#{@locktoken}>"]},
+                                              @body, :lock)
     assert_instance_of RubyDav::OkLockResponse, response
     assert_instance_of RubyDav::LockDiscovery, response.lock_discovery
-    assert_equal 'www.example.org', response.lock_discovery.locks[0].root
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_equal @locktoken, response.lock_token
+    assert_equal [@locktoken], response.lock_discovery.locks.keys
+    
+    assert_equal 'www.example.org', response.active_lock.root
   end
 
   def test_initialize
     response = RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
-                                            {}, @body, :lock_discovery)
+                                            { 'lock-token' =>
+                                              ["<#{@locktoken}>"]},
+                                            @body, :lock_discovery)
     assert_instance_of RubyDav::OkLockResponse, response
     assert_equal :lock_discovery, response.lock_discovery
+  end
+
+  def test_initialize__missing_lock_token_header
+    assert_raises RubyDav::BadResponseError do
+      RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
+                                   {}, @body, :lock_discovery)
+    end
+  end
+  
+  def test_initialize__multiple_lock_token_headers
+    assert_raises RubyDav::BadResponseError do
+      RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
+                                   { 'lock-token' =>
+                                     [ '<token1>', '<token2>' ]},
+                                   @body, :lock_discovery)
+    end
   end
   
   def test_parse_body
