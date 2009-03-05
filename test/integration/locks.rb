@@ -463,10 +463,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_hr_move_response '412', [resumes_locktoken, archives_locktoken]
     assert_hr_move_response '201', [[resumes_locktoken], [archives_locktoken]]
 
-    response = propfind 'httplock/hr/archives', 0, :lockdiscovery
+    response = @request.propfind 'httplock/hr/archives', 0, :lockdiscovery
     assert_equal '207', response.status
     assert_equal '200', response[:lockdiscovery].status
-    archives_lock2 = response[:lockdiscovery].lockdiscovery
+    archives_lockdiscovery2 = response[:lockdiscovery].lockdiscovery
+    assert_equal 1, archives_lockdiscovery2.locks.size
+    archives_lock2 = archives_lockdiscovery2.locks.values[0]
 
     assert_equal archives_lock, archives_lock2
 

@@ -11,7 +11,9 @@ module RubyDav
         self.scope == other.scope &&
         self.type == other.type &&
         self.depth == other.depth &&
-        self.owner.strip == other.owner.strip &&
+        ((self.owner.nil? && other.owner.nil?) ||
+         (!self.owner.nil? && !other.owner.nil? &&
+          self.owner.strip == other.owner.strip)) &&
         self.timeout == other.timeout &&
         self.token == other.token
     end
