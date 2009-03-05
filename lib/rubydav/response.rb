@@ -435,7 +435,7 @@ module RubyDav
       
       # returns a hash of PropKey -> PropertyResult
       def parse_propstats parent_elem
-        properties = Hash.new { |h, k| h[PropKey.strictly_prop_key k ] }
+        properties = Hash.new { |h, k| h[PropKey.strictly_prop_key(k) ] }
         
         RubyDav.xpath_match(parent_elem, 'propstat').each do |ps_elem|
           status_elem = RubyDav.xpath_first(ps_elem, 'status')

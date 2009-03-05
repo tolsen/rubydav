@@ -154,7 +154,7 @@ EOS
     assert_equal 'http://www.example.com/groups/mrktng', ace.principal
 
     assert_equal :deny, ace.action
-    assert_equal [RubyDav::PropKey.get 'DAV:', 'read'], ace.privileges
+    assert_equal [RubyDav::PropKey.get('DAV:', 'read')], ace.privileges
 
     assert !ace.protected?
   end
@@ -208,7 +208,7 @@ EOS
     assert_equal :all, ace.principal
 
     assert_equal :grant, ace.action
-    assert_equal [RubyDav::PropKey.get 'DAV:', 'read'], ace.privileges
+    assert_equal [RubyDav::PropKey.get('DAV:', 'read')], ace.privileges
 
     assert_equal 'http://www.example.com/top', ace.url
     assert !ace.protected?
@@ -244,7 +244,7 @@ EOS
 
     assert_equal :grant, ace.action
 
-    assert_equal [RubyDav::PropKey.get 'DAV:', 'all'], ace.privileges
+    assert_equal [RubyDav::PropKey.get('DAV:', 'all')], ace.privileges
     assert ace.protected?
   end
 

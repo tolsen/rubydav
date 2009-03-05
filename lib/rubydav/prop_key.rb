@@ -36,7 +36,7 @@ module RubyDav
       return propkey_or_symbol unless propkey_or_symbol.is_a?(Symbol)
       return @@registeredkeys[propkey_or_symbol] if
         @@registeredkeys.include? propkey_or_symbol
-      return self.get "DAV:", propkey_or_symbol
+      return self.get("DAV:", propkey_or_symbol)
     end
     
     # registers a PropKey to have alias <tt>symbol</tt>

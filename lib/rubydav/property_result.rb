@@ -40,8 +40,8 @@ module RubyDav
 
       def define_class_reader method_name, klass, prop_name, namespace = 'DAV:'
         define_method method_name do
-          next nil if prop_key != PropKey.get(namespace, prop_name)
-          next klass.from_elem(element)
+          return nil if prop_key != PropKey.get(namespace, prop_name)
+          return klass.from_elem(element)
         end
       end
     end
