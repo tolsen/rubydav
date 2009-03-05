@@ -8,6 +8,13 @@ module RubyDav
     # locks is a hash from lock_tokens -> active_locks
     attr_reader :locks
 
+    def eql? other
+      return other.is_a?(LockDiscovery) &&
+        self.locks == other.locks
+    end
+
+    alias == eql?
+    
     # pass in a list of ActiveLock objects
     def initialize *locks
       @locks = locks.inject({}) { |h, l| h[l.token] = l; h }

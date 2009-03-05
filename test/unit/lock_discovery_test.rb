@@ -49,6 +49,19 @@ EOS
     @lock_discovery_elem = body_root_element @lockdiscovery_str
   end
 
+  def test_eql__equal
+    lock_discovery2 = RubyDav::LockDiscovery.new @lock2, @lock1
+    assert_equal @lock_discovery, lock_discovery2
+  end
+
+  def test_eql__not_equal
+    assert_not_equal @lock_discovery, nil
+
+    lock3 = flexmock 'lock3', :token => 'token3'
+    lock_discovery2 = RubyDav::LockDiscovery.new @lock1, lock3
+    assert_not_equal @lock_discovery, lock_discovery2
+  end
+
   def test_from_elem
     lock_discovery = RubyDav::LockDiscovery.from_elem @lock_discovery_elem
     lock_discovery.locks.each_value do |l|

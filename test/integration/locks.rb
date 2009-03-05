@@ -454,14 +454,21 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     resumes_locktoken = lock('httplock/hr/recruiting/resumes',
                              :depth => RubyDav::INFINITY).token
-    archives_locktoken = lock('httplock/hr/archives',
-                              :depth => RubyDav::INFINITY).token
+    archives_lock = lock 'httplock/hr/archives', :depth => RubyDav::INFINITY
+    archives_locktoken = archives_lock.token
 
     assert_hr_move_response '423'
     assert_hr_move_response '423', resumes_locktoken 
     assert_hr_move_response '412', archives_locktoken
     assert_hr_move_response '412', [resumes_locktoken, archives_locktoken]
     assert_hr_move_response '201', [[resumes_locktoken], [archives_locktoken]]
+
+    response = propfind 'httplock/hr/archives', 0, :lockdiscovery
+    assert_equal '207', response.status
+    assert_equal '200', response[:lockdiscovery].status
+    archives_lock2 = response[:lockdiscovery].lockdiscovery
+
+    assert_equal archives_lock, archives_lock2
 
     # cleanup
     response = @request.unlock('httplock/hr/recruiting/resumes', resumes_locktoken)

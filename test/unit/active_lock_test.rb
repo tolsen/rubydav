@@ -67,6 +67,26 @@ EOS
 EOS
   end
 
+  def test_eql__equal
+    active_lock2 =
+      RubyDav::ActiveLock.new(:write, :exclusive, 0, 10000,
+                              '  <D:href>http://example.org/~ejw/contact.html</D:href> ',
+                              'urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4',
+                              '/foo/bar')
+    assert_equal @active_lock, active_lock2
+  end
+
+  def test_eql__not_equal
+    assert_not_equal @active_lock, nil
+    
+    active_lock2 =
+      RubyDav::ActiveLock.new(:write, :shared, 0, 20000,
+                              '<D:href>http://example.org/~ejw/contact.html</D:href>',
+                              'urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4',
+                              '/foo/bar')
+    assert_not_equal @active_lock, active_lock2
+  end
+
   def test_from_elem
     active_lock =
       RubyDav::ActiveLock.from_elem body_root_element(@activelock_str)

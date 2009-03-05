@@ -5,6 +5,19 @@ module RubyDav
     attr_reader :scope, :type, :depth, :owner, :timeout, :token
     attr_accessor :root
 
+    # does not check that root is equal
+    def eql? other
+      return other.is_a?(ActiveLock) &&
+        self.scope == other.scope &&
+        self.type == other.type &&
+        self.depth == other.depth &&
+        self.owner.strip == other.owner.strip &&
+        self.timeout == other.timeout &&
+        self.token == other.token
+    end
+
+    alias == eql?
+
     def initialize type, scope, depth, timeout, owner, token, root
       @type = type
       @scope = scope
