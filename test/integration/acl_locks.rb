@@ -131,4 +131,20 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     # now, delete lockfile wo locktoken
     delete_file lockfile
   end
+
+  def failing_test_locking_privilege
+    new_file 'lockfile'
+
+    response = @request.lock 'lockfile', testcreds
+    assert_equal '403', response.status
+
+    ace = RubyDav::Ace.new :grant, test_principal_uri, false, :'write-content'
+    add_ace_and_set_acl 'lockfile', ace
+    
+    response = @request.lock 'lockfile', testcreds
+    assert_equal '200', response.status
+  ensure
+    delete_file 'lockfile'
+  end
+  
 end
