@@ -195,30 +195,27 @@ class MultiStatusResponseTest < RubyDavUnitTestCase
   end
 
   def test_responses
-    assert_equal 4, @responses.length
-    
-    assert_instance_of RubyDav::PreconditionFailedError, @responses[0]
-    assert_equal "http://www.example.org/othercontainer/R2/", @responses[0].url
-    
-    assert_instance_of RubyDav::PreconditionFailedError, @responses[1]
-    assert_equal "http://www.example.org/othercontainer/R3/", @responses[1].url
-    
-    assert_instance_of RubyDav::ForbiddenError, @responses[2]
-    assert_equal "http://www.example.org/othercontainer/R4/R5/", @responses[2].url
-    
-    assert_equal @response, @responses[3]
+    prefix = 'http://www.example.org/othercontainer/'
+    assert_equal 3, @responses.length
+
+    %w(R2/ R3/ R4/R5/).each do |suffix|
+      url = prefix + suffix
+      assert_equal url, @responses[url].href
+    end
+
+    assert_equal '412', @responses[prefix + 'R2/'].status
+    assert_equal '412', @responses[prefix + 'R3/'].status
+    assert_equal '403', @responses[prefix + 'R4/R5/'].status
   end
   
   def test_initialize
     responses = @responses.clone
-    headers = Hash.new
-    response = RubyDav::MultiStatusResponse.new(@url, '207', headers, @body, responses, :copy, "description")
+    response = RubyDav::MultiStatusResponse.new(@url, '207', {}, @body, responses, :copy, "description")
     
     assert_equal @url, response.url
     assert_equal '207', response.status
-    assert_equal headers, response.headers
+    assert_equal({}, response.headers)
     assert_equal @body, response.body
-    responses << response
     assert_equal responses, response.responses
     assert_equal "description", response.description
   end

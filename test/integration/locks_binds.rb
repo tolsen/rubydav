@@ -294,13 +294,13 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unbind('', 'srccol')
     # we don't provide some locks on children and some on the collection itself. the response is sometimes
     # 423 and sometimes 207 depending on the order in which the locks are retreived from the database when checking
-    assert (response.status == '423' || (response.status == '207' && response.responses[0].status == '423'))
+    assert (response.status == '423' || (response.status == '207' && response.responses.values[0].status == '423'))
     
     ifhdr = Hash.new { |h, k| h[k] = [] }
     locks[0..1].each do |l|
       ifhdr[l.root] << l.token
       response = @request.unbind('', 'srccol', :if => ifhdr)
-      assert (response.status == '423' || (response.status == '207' && response.responses[0].status == '423'))
+      assert (response.status == '423' || (response.status == '207' && response.responses.values[0].status == '423'))
     end
 
     ifhdr[locks[2].root] << locks[2].token
