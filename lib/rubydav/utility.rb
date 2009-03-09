@@ -60,6 +60,14 @@ module RubyDav
       return REXML::XPath.match(elem, path, namespaces)
     end
 
+    # runs xpath_first against the path with "/text()" appended
+    # and converts to String
+    # return nil if not found
+    def xpath_text elem, path, namespaces = {}
+      text_node = xpath_first elem, "#{path}/text()", namespaces
+      return text_node.nil? ? nil : text_node.to_s
+    end
+    
     def assert_elem_name elem, name, namespace = 'DAV:'
       raise ArgumentError unless
         elem.namespace == namespace && elem.name == name

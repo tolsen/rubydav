@@ -4,6 +4,7 @@ require File.dirname(__FILE__) + '/errors'
 require File.dirname(__FILE__) + '/lock_discovery'
 require File.dirname(__FILE__) + '/rexml_fixes'
 require File.dirname(__FILE__) + '/utility'
+require File.dirname(__FILE__) + '/sub_response'
 
 module RubyDav
 
@@ -101,44 +102,55 @@ module RubyDav
     attr_reader :description
     attr_reader :body
     
+    # hash of href -> SubResponse
+    attr_reader :responses
+    
     def error?
-      @method == :copy
+      @method == :copy || :lock
+    end
+
+    def unauthorized?
+      @unauthorized ||= responses.values.any? { |r| r.status == '401' }
+      return @unauthorized
     end
 
     def self.create(url,status,headers,body,method)
-      responses = Array.new
+      responses = {}
       root = REXML::Document.new(body).root
 
       raise BadResponseError unless (root.namespace == "DAV:" and root.name == "multistatus")
 
-      description = REXML::XPath.first(root, "D:responsedescription/text()", {"D" => "DAV:"}).to_s
-      response_elements = REXML::XPath.match(root, "D:response", {"D" => "DAV:"})
+      description = RubyDav.xpath_text root, 'responsedescription'
+      
+      response_elements = RubyDav.xpath_match root, "response"
       raise BadResponseError if response_elements.empty?
 
       response_elements.each do |response_element|
-        status_element = REXML::XPath.first(response_element, "D:status", {"D" => "DAV:"})
-        sub_status = RubyDav.parse_status(status_element.text)
+        sub_status_str = RubyDav.xpath_text response_element, "status"
+        sub_status = RubyDav.parse_status sub_status_str
+        error_elem = RubyDav.xpath_first response_element, 'error'
+        error = DavError.parse_dav_error error_elem
+        sub_description = RubyDav.xpath_text response_element, 'responsedescription'
+        location = RubyDav.xpath_text response_element, 'location'
         
-        hrefs = REXML::XPath.match(response_element, "D:href/text()", {"D" => "DAV:"})
-        responses += hrefs.map do |href|
-          ResponseFactory.get(href.to_s, sub_status, headers, nil, method)
+        hrefs = RubyDav.xpath_match response_element, "href/text()"
+        hrefs.each do |href|
+          raise BadResponseError if responses.include? href
+          responses[href.to_s] =
+            SubResponse.new href.to_s, sub_status, error, sub_description, location
         end
       end
       MultiStatusResponse.new(url, status, headers, body, responses, method, description)
     end
 
-    # returns list of responses inside MultiStatusResponse
-    attr_reader :responses
 
     private
     def initialize(url, status, headers, body, responses, method=nil, description=nil)
-      @responses = responses || Array.new
-      @responses << self
+      @responses = responses || {}
       @body = body
       @method = method
       @description = description
       super(url, status, headers)
-      @unauthorized = responses.any? { |r| r.unauthorized? } unless responses.nil?
     end
   end
 
@@ -375,7 +387,7 @@ module RubyDav
     end
   end
 
-  # For mulistatus responses that return individual DAV:response elements with
+  # For multistatus responses that return individual DAV:response elements with
   # DAV:propstat elements
   class PropstatResponse < MultiStatusResponse
     
@@ -486,17 +498,6 @@ module RubyDav
 
         return { url => parse_propstats(root) }
       end
-    end
-  end
-
-  # response to an unsuccessful lock request (RubyDav.lock)
-  class LockMultiResponse < MultiStatusResponse #:nodoc:
-    # returns list of failed dependencies for the Lock request
-    def failed_dependencies
-    end
-
-    # Response object pertaining to the request URL that you failed to lock
-    def head
     end
   end
 
