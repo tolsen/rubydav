@@ -516,7 +516,7 @@ class WebDavDeltavTest < Test::Unit::TestCase
 
     response = @request.copy 'srccol', 'dstcol', RubyDav::INFINITY, true
     assert_equal '207', response.status
-    dstfile_err_resp = response.responses.find {|resp| resp.url.match(/dstcol\/file$/) }
+    dstfile_err_resp = response.responses[@uri.path + 'dstcol/file']
     assert_equal '409', dstfile_err_resp.status
 
     delete_coll 'srccol'

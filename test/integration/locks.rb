@@ -241,8 +241,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     # assert multi-status with 424 for req-uri and 403 for troublesome child
     assert_equal '207', response.status
     resps = response.responses
-    assert_equal '424', resps.detect{|resp| (@uri.path + 'coll') == resp.url}.status
-    assert_equal '403', resps.detect{|resp| (@uri.path + 'coll/secret') == resp.url}.status
+    assert_equal '424', resps[@uri.path + 'coll'].status
+    assert_equal '403', resps[@uri.path + 'coll/secret'].status
 
     # cleanup
     response = @request.delete('coll', :depth => RubyDav::INFINITY)
@@ -267,8 +267,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.lock 'coll'
     assert_equal '207', response.status
     resps = response.responses
-    assert_equal '424', resps.detect{|resp| (@uri.path + 'coll') == resp.url}.status
-    assert_equal '423', resps.detect{|resp| (@uri.path + 'coll/subcoll') == resp.url}.status
+    assert_equal '424', resps[@uri.path + 'coll'].status
+    assert_equal '423', resps[@uri.path + 'coll/subcoll'].status
 
     response = @request.delete('coll', :depth => RubyDav::INFINITY,
                                :if => { 'coll/subcoll' => lock.token })
