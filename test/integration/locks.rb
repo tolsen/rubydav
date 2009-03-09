@@ -74,6 +74,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     #should still be locked, even if locktoken is provided
     response = @request.lock 'col/file', :if => lock.token
     assert_equal '423', response.status
+
+    response = @request.unlock 'col', lock.token
+    assert_equal '204', response.status
   ensure
     teardown_col
   end
