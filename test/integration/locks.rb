@@ -7,14 +7,34 @@ class WebDavLocksTest < Test::Unit::TestCase
   def setup
     webdavtestsetup
   end
+
+  def setup_col
+    @request.delete 'col'
+    response = @request.mkcol 'col'
+    assert_equal '201', response.status
+
+    response = @request.put 'col/file', @stream
+    assert_equal '201', response.status
+  end
+
+  def setup_file
+    @request.delete('file')
+    response = @request.put('file', @stream)
+    assert_equal '201', response.status
+  end
+
+  def teardown_col
+    @request.delete 'col'
+  end
+
+  def teardown_file
+    @request.delete 'file'
+  end
   
   # Create a file, lock it, unlock it and then delete it
   def test_lock_unlock
-    response = @request.delete('file')
-
-    response = @request.put('file', @stream)
-    assert_equal '201', response.status
-
+    setup_file
+    
     # get an exclusive write lock
     owner = "<D:href xmlns:D='DAV:'>http://tim.limebits.com/</D:href>"
     lock = lock 'file', :depth => 0, :owner => owner
@@ -30,6 +50,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     # not checking timeout as that is server dependent
     # supposedly, so is the locktoken (it may not even have to be
     # returned according to the spec?!)
+
+    response = @request.lock 'file'
+    assert_equal '423', response.status
     
     # assert that it can't be deleted while still locked
     response = @request.delete('file')
@@ -37,9 +60,22 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     response = @request.unlock('file', lock.token)
     assert_equal '204', response.status
+  ensure
+    teardown_file
+  end
 
-    response = @request.delete('file')
-    assert_equal '204', response.status
+  def test_lock_conflict_indirectly
+    setup_col
+
+    lock = lock 'col', :depth => RubyDav::INFINITY
+    response = @request.lock 'col/file'
+    assert_equal '423', response.status
+
+    #should still be locked, even if locktoken is provided
+    response = @request.lock 'col/file', :if => lock.token
+    assert_equal '423', response.status
+  ensure
+    teardown_col
   end
 
   def test_put_on_locknull
@@ -275,9 +311,7 @@ class WebDavLocksTest < Test::Unit::TestCase
   end
 
   def test_double_shared_lock
-    response = @request.delete('file')
-    response = @request.put('file', @stream)
-    assert_equal '201', response.status
+    setup_file
 
     shared_lock1 = lock 'file', :scope => :shared, :depth => 0
     shared_lock2 = lock 'file', :scope => :shared, :depth => 0
@@ -294,16 +328,12 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     response = @request.unlock('file', shared_lock1.token)
     assert_equal '204', response.status
-
-    response = @request.delete('file')
-    assert_equal '204', response.status
+  ensure
+    teardown_file
   end
 
   def test_move_simple_locked_file
-    response = @request.delete('file')
-    response = @request.put('file', @stream)
-    assert_equal '201', response.status
-
+    setup_file
     lock = lock 'file'
 
     response = @request.move('file', 'who-cares', false)
@@ -321,33 +351,23 @@ class WebDavLocksTest < Test::Unit::TestCase
   end
 
   def test_copy_on_medium_whose_parent_has_depth0_lock
-    col = 'col'
-    response = @request.delete(col)
-    response = @request.mkcol(col)
-    assert_equal '201', response.status
+    setup_col
+    setup_file
 
-    col_file = col + '/file'
-    response = @request.put(col_file, @stream)
-    assert_equal '201', response.status
-
-    lock = lock col, :depth => 0
+    lock = lock 'col', :depth => 0
     assert_equal 0, lock.depth
 
-    response = @request.put(col_file, StringIO.new("Should succeed"))
+    response = @request.put('col/file', StringIO.new("Should succeed"))
     assert_equal '204', response.status
 
-    file = 'file'
-    response = @request.put(file, StringIO.new("file to copy"))
-    assert_equal '201', response.status
-
-    response = @request.copy(file, col_file, 0, true)
+    response = @request.copy('file', 'col/file', 0, true)
     assert_equal '204', response.status
 
     # cleanup using unbind for a change
     response = @request.unbind('', "col")
     assert_equal '423', response.status
 
-    response = @request.unbind('', "col", :if => { col => lock.token })
+    response = @request.unbind('', "col", :if => { 'col' => lock.token })
     assert_equal '200', response.status
 
     response = @request.unbind('', "file")
