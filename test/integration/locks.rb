@@ -64,16 +64,23 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_file
   end
 
-  def test_lock_conflict_indirectly
+  def test_lock_depth_infinity
     setup_col
 
     lock = lock 'col', :depth => RubyDav::INFINITY
     response = @request.lock 'col/file'
     assert_equal '423', response.status
 
-    #should still be locked, even if locktoken is provided
+    #should still return locked, even if locktoken is provided
     response = @request.lock 'col/file', :if => lock.token
     assert_equal '423', response.status
+
+    # check that lockdiscovery is available on indirectly locked files
+    response = @request.propfind 'col/file', 0, :lockdiscovery
+    assert_equal '207', response
+    assert_equal '200', response[:lockdiscovery].status
+    lockdiscovery = response[:lockdiscovery].lockdiscovery
+    assert_equal [lock], response[:lockdiscovery].locks
 
     response = @request.unlock 'col', lock.token
     assert_equal '204', response.status
