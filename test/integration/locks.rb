@@ -4,6 +4,22 @@ require 'test/integration/webdavtestsetup'
 
 class WebDavLocksTest < Test::Unit::TestCase
   include WebDavTestSetup
+
+  def assert_put_and_delete_requires_token(path, token,
+                                           expected_put_status = '201')
+    response = @request.put path, test_stream
+    assert_equal '423', response.status
+
+    response = @request.put path, test_stream, :if => token
+    assert_equal expected_put_status, response.status
+
+    response = @request.delete path
+    assert_equal '423', response.status
+
+    response = @request.delete path, :if => token
+    assert_equal '204', response.status
+  end
+  
   def setup
     webdavtestsetup
   end
@@ -64,6 +80,22 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_file
   end
 
+  def test_lock_put_simple_if
+    setup_file
+
+    lock = lock 'file'
+    response = @request.put 'file', test_stream
+    assert_equal '423', response.status
+
+    response = @request.put 'file', test_stream, :if => lock.token
+    assert_equal '204', response.status
+
+    response = @request.unlock 'file', lock.token
+    assert_equal '204', response.status
+  ensure
+    teardown_file
+  end
+
   def test_lock_depth_infinity
     setup_col
 
@@ -77,10 +109,13 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     # check that lockdiscovery is available on indirectly locked files
     response = @request.propfind 'col/file', 0, :lockdiscovery
-    assert_equal '207', response
+    assert_equal '207', response.status
     assert_equal '200', response[:lockdiscovery].status
-    lockdiscovery = response[:lockdiscovery].lockdiscovery
-    assert_equal [lock], response[:lockdiscovery].locks
+    assert_equal [lock], response[:lockdiscovery].lockdiscovery.locks.values
+
+    assert_put_and_delete_requires_token 'col/file', lock.token, '204'
+    
+#    assert_put_and_delete_requires_token 'col/file2', lock.token
 
     response = @request.unlock 'col', lock.token
     assert_equal '204', response.status
@@ -586,8 +621,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unlock('httplock/b', b_locktoken)
     assert_equal '204', response.status
     delete_coll('httplock')
-  end 
- 
+  end
+
   # WebDAV book (L. Dusseault) p. 195 8.4.12 (Listing 8-13)
   def test_put_new_resource_locked_collection_zero_depth
     setup_hr

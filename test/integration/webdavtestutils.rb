@@ -146,6 +146,6 @@ module WebDavTestUtils
     URI.parse(@host).path + relative_path
   end
   
-    
+  def test_stream() StringIO.new('test'); end
   
 end
