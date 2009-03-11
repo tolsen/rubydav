@@ -665,6 +665,33 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
     delete_coll 'httplock'
   end
+
+  # limestone specific (depends on timeouts)
+  def test_lock_refresh
+    setup_file
+
+    lock1 = lock 'file', :timeout => 1000
+    assert_in_delta 1000, lock1.timeout, 50
+
+    # uncomment sleep to see that refresh does not
+    # even reset to 1000
+    #sleep 3
+
+    response = @request.lock('file', :refresh => true,
+                             :if => lock1.token, :timeout => 10000)
+    assert_equal '200', response.status
+    locks = response.lock_discovery.locks
+    assert_equal 1, locks.size
+    lock2 = locks[lock1.token]
+
+    # CURRENTLY FAILING
+    #assert_in_delta 10000, lock2.timeout, 50
+
+    response = @request.unlock 'file', lock1.token
+    assert_equal '204', response.status
+  ensure
+    teardown_file
+  end
    
   def assert_hr_move_response exp_response, if_hdr=nil
     opts = {}

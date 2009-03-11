@@ -544,19 +544,26 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :move, srcurl, nil, options
       end
 
-      # options: scope, owner, type, depth, timeout
+      # options: scope, owner, type, depth, timeout, refresh
+      #
+      # when refreshing, set :refresh to true and set the :if option.
+      # you may ask for a new timeout but you may not change scope,
+      # owner, type, or depth.
       def lock url, options={}
-        scope = options[:scope] || :exclusive
-        type = options[:type] || :write
+        stream = nil
+        unless options[:refresh]
+          scope = options[:scope] || :exclusive
+          type = options[:type] || :write
 
-        stream = RubyDav.build_xml_stream do |xml|
-          xml.lockinfo 'xmlns' => 'DAV:' do
-            xml.locktype { xml.tag! type }
-            xml.lockscope { xml.tag! scope }
-            xml.owner { xml << options[:owner] } if options.include? :owner
+          stream = RubyDav.build_xml_stream do |xml|
+            xml.lockinfo 'xmlns' => 'DAV:' do
+              xml.locktype { xml.tag! type }
+              xml.lockscope { xml.tag! scope }
+              xml.owner { xml << options[:owner] } if options.include? :owner
+            end
           end
         end
-
+        
         request :lock, url, stream, options
       end
 

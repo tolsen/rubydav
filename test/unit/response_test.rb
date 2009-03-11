@@ -111,6 +111,20 @@ EOS
     assert_equal 'www.example.org', response.active_lock.root
   end
 
+  def test_create__without_lock_token_header
+    response = RubyDav::OkLockResponse.create('www.example.org', '200',
+                                              {}, @body, :lock)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_instance_of RubyDav::LockDiscovery, response.lock_discovery
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_nil response.lock_token
+    assert_equal [@locktoken], response.lock_discovery.locks.keys
+
+    assert_nil response.active_lock
+    assert_equal('http://example.com/workspace/webdav/proposal.doc',
+                 response.lock_discovery.locks.values[0].root)
+  end
+
   def test_initialize
     response = RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
                                             { 'lock-token' =>
@@ -120,13 +134,6 @@ EOS
     assert_equal :lock_discovery, response.lock_discovery
   end
 
-  def test_initialize__missing_lock_token_header
-    assert_raises RubyDav::BadResponseError do
-      RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
-                                   {}, @body, :lock_discovery)
-    end
-  end
-  
   def test_initialize__multiple_lock_token_headers
     assert_raises RubyDav::BadResponseError do
       RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',

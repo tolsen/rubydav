@@ -179,6 +179,7 @@ module RubyDav
 
     # returns ActiveLock object for this request
     def active_lock
+      return nil if @lock_token.nil?
       return @lock_discovery.locks[@lock_token]
     end
 
@@ -188,7 +189,8 @@ module RubyDav
         lock_discovery = parse_body(body)
 
         response = new url, status, headers, body, lock_discovery
-        response.active_lock.root = url
+        active_lock = response.active_lock
+        active_lock.root = url unless active_lock.nil?
         return response
       end
 
@@ -207,10 +209,15 @@ module RubyDav
 
     def initialize(url, status, headers, body, lock_discovery)
       @lock_discovery = lock_discovery
-      lt_hdr_vals = headers['lock-token']
-      raise BadResponseError unless
-        lt_hdr_vals.is_a?(Array) && lt_hdr_vals.size == 1
-      @lock_token = lt_hdr_vals[0].sub /^\s*<(.*)>\s*$/, '\1'
+
+      # Lock-Token header is not set on lock refreshes
+      if headers.include? 'lock-token'
+        lt_hdr_vals = headers['lock-token']
+        raise BadResponseError unless
+          lt_hdr_vals.is_a?(Array) && lt_hdr_vals.size == 1
+        @lock_token = lt_hdr_vals[0].sub /^\s*<(.*)>\s*$/, '\1'
+      end
+      
       super(url, status, headers, body)
     end
   end
