@@ -96,7 +96,27 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_file
   end
 
-  def test_lock_depth_infinity
+  def test_lock_collection_depth_zero
+    setup_col
+
+    lock = lock 'col', :depth => 0
+
+    # modifying an existing file should *not* require
+    # the locktoken
+    response = @request.put 'col/file', test_stream
+    assert_equal '204', response.status
+
+    # creating a new file and deleting it should require the locktoken
+    # CURRENTLY FAILING
+#    assert_put_and_delete_requires_token 'col/file2', lock.token
+
+    response = @request.unlock 'col', lock.token
+    assert_equal '204', response.status
+  ensure
+    teardown_col
+  end
+
+  def test_lock_collection_depth_infinity
     setup_col
 
     lock = lock 'col', :depth => RubyDav::INFINITY
@@ -114,7 +134,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal [lock], response[:lockdiscovery].lockdiscovery.locks.values
 
     assert_put_and_delete_requires_token 'col/file', lock.token, '204'
-    
+
+    # CURRENTLY FAILING
 #    assert_put_and_delete_requires_token 'col/file2', lock.token
 
     response = @request.unlock 'col', lock.token
