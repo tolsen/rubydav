@@ -171,6 +171,37 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_col
   end
 
+  def test_lock_collection_depth_zero_with_descendant_locks
+    setup_col
+
+    response = @request.put 'col/file2', StringIO.new('string1')
+    assert_equal '201', response.status
+
+    lock1 = lock 'col/file', :depth => 0
+    lock2 = lock 'col', :depth => 0
+
+    response = @request.put 'col/file2', StringIO.new('string2')
+    assert_equal '204', response.status
+
+    lock3 = lock 'col/file2', :depth => 0
+
+    response = @request.put 'col/file2', StringIO.new('string2')
+    assert_equal '423', response.status
+
+    response = @request.put('col/file2', StringIO.new('string2'),
+                            :if => lock3.token)
+    assert_equal '204', response.status
+
+    { 'col/file' => lock1,
+      'col' => lock2,
+      'col/file2' => lock3 }.each do |f, l|
+      response = @request.unlock f, l.token
+      assert_equal '204', response.status
+    end
+  ensure
+    teardown_col
+  end
+
   def test_lock_collection_depth_infinity
     setup_col
 
