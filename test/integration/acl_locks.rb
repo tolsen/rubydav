@@ -156,6 +156,35 @@ class WebDavAclLocksTest < Test::Unit::TestCase
 
     delete_file 'file'
   end
+  
+  # limestone specific.  assumes some lack of default acls
+  def failing_test_lock_acl
+    new_file 'file'
+    lock = lock 'file'
+    
+    acl = get_acl 'file'
+    ace = RubyDav::Ace.new :grant, test_principal_uri, false, :'read-acl'
+    acl.unshift ace
+
+    response = @request.acl 'file', acl
+    assert_equal '423', response.status
+
+    response = @request.propfind 'file', 0, :acl, testcreds
+    assert_equal '207', response.status
+    assert_equal '403', response[:acl].status
+
+    response = @request.acl 'file', acl, :if => lock.token
+    assert_equal '200', response.status
+
+    response = @request.propfind 'file', 0, :acl, testcreds
+    assert_equal '207', response.status
+    assert_equal '200', response[:acl].status
+
+    response = @request.unlock 'file'
+    assert_equal '204', response.status
+
+    delete_file 'file'
+  end
    
   def failing_test_locking_privilege
     new_file 'lockfile'

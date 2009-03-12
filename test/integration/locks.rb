@@ -80,7 +80,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_file
   end
 
-  def test_lock_put_simple_if
+  def test_lock_simple_if
     setup_file
 
     lock = lock 'file'
