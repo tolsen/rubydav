@@ -62,19 +62,20 @@ class WebDavLocksTest < Test::Unit::TestCase
     
     # get an exclusive write lock
     owner = "<D:href xmlns:D='DAV:'>http://tim.limebits.com/</D:href>"
-    lock = lock 'file', :depth => 0, :owner => owner
+    lock = lock 'file', :depth => 0, :owner => owner, :timeout => 1000
 
     assert_equal :write, lock.type
     assert_equal :exclusive, lock.scope
     assert_equal 0, lock.depth
 
+    # timeout & token check are limestone specific
+    assert_in_delta 1000, lock.timeout, 50
+    assert_not_nil lock.token
+
     assert_xml_matches lock.owner do |xml|
       xml.xmlns! :D => "DAV:"
       xml.D :href, 'http://tim.limebits.com/'
     end
-    # not checking timeout as that is server dependent
-    # supposedly, so is the locktoken (it may not even have to be
-    # returned according to the spec?!)
 
     response = @request.lock 'file'
     assert_equal '423', response.status
@@ -149,6 +150,20 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal 'newer name', response[:displayname].inner_value.strip
   ensure
     teardown_file
+  end
+
+  def test_lock_expired
+    setup_file
+
+    lock = lock 'file', :timeout => 1
+    sleep 2
+    
+    assert_empty_lockdiscovery 'file'
+    response = @request.put 'file', StringIO.new('string10')
+    assert_equal '204', response.status
+
+    response = @request.delete 'file'
+    assert_equal '204', response.status
   end
 
   def test_lock_collection_depth_zero
@@ -390,10 +405,10 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.delete res_name
 
     # create a exclusive write locked null resource
-    lock res_name, :depth => 0, :timeout => 2
+    lock res_name, :depth => 0, :timeout => 1
 
     # wait for the lock to expire
-    sleep 4
+    sleep 2
 
     response = @request.propfind(res_name, 0, :displayname)
     assert_equal '404', response.status
