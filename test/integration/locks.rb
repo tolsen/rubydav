@@ -90,6 +90,24 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put 'file', test_stream, :if => lock.token
     assert_equal '204', response.status
 
+    response = @request.propfind 'file', 0, :displayname
+    assert_equal '207', response.status
+    assert_equal '200', response[:displayname].status
+    assert_not_equal 'new name', response[:displayname].inner_value.strip
+
+    response = @request.proppatch 'file', :displayname => 'new name'
+    assert_equal '423', response.status
+
+    response = @request.proppatch('file', { :displayname => 'new name' },
+                                  :if => lock.token)
+    assert_equal '207', response.status
+    assert_equal '200', response[:displayname].status
+
+    response = @request.propfind 'file', 0, :displayname
+    assert_equal '207', response.status
+    assert_equal '200', response[:displayname].status
+    assert_equal 'new name', response[:displayname].inner_value.strip
+
     response = @request.unlock 'file', lock.token
     assert_equal '204', response.status
   ensure
@@ -693,48 +711,6 @@ class WebDavLocksTest < Test::Unit::TestCase
     teardown_file
   end
 
-  def test_lock_not_owner
-    setup_file
-
-    response = @request.put 'file', StringIO.new('string1'), testcreds
-    assert_equal '403', response.status
-
-    grant_write = RubyDav::Ace.new :grant, test_principal_uri, false, :write
-    add_ace_and_set_acl 'file', grant_write
-
-    response = @request.put 'file', StringIO.new('string2'), testcreds
-    assert_equal '204', response.status
-
-    lock = lock 'file'
-
-    response = @request.put 'file', StringIO.new('string3'), testcreds
-    assert_equal '423', response.status
-
-    # having the lock token shouldn't allow you to write if you
-    # are not the lock owner
-    response = @request.put('file', StringIO.new('string4'),
-                            testcreds.merge(:if => lock.token))
-    assert_equal '423', response.status
-
-    # likewise for unlock if you do not have DAV:unlock privilege
-    response = @request.unlock 'file', lock.token, testcreds
-    assert_equal '403', response.status
-
-    grant_unlock = RubyDav::Ace.new :grant, test_principal_uri, false, :unlock
-    add_ace_and_set_acl 'file', grant_unlock
-
-    # should still not be able to write even if you have DAV:unlock
-    response = @request.put('file', StringIO.new('string5'),
-                            testcreds.merge(:if => lock.token))
-    assert_equal '423', response.status
-
-    # but you should now be able to unlock
-    response = @request.unlock 'file', lock.token, testcreds
-    assert_equal '204', response.status
-  ensure
-    teardown_file
-  end
-   
   def assert_hr_move_response exp_response, if_hdr=nil
     opts = {}
     opts = { :if => if_hdr } unless if_hdr.nil?

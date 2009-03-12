@@ -115,23 +115,48 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     delete_file lockfile
   end
 
-  def test_acl_unlock_privilege
-    lockfile = 'lockfile'
-    new_file lockfile
-    lock = lock lockfile
+  def test_lock_not_owner
+    new_file 'file'
 
-    # grant unlock on lockfile to 'test'
-    grant_unlock = RubyDav::Ace.new(:grant, test_principal_uri, false, :unlock)
-    add_ace_and_set_acl lockfile, grant_unlock
+    response = @request.put 'file', StringIO.new('string1'), testcreds
+    assert_equal '403', response.status
 
-    # try to unlock lockfile w 'test' user, w locktoken
-    response = @request.unlock(lockfile, lock.token, testcreds)
+    grant_write = RubyDav::Ace.new :grant, test_principal_uri, false, :write
+    add_ace_and_set_acl 'file', grant_write
+
+    response = @request.put 'file', StringIO.new('string2'), testcreds
     assert_equal '204', response.status
 
-    # now, delete lockfile wo locktoken
-    delete_file lockfile
-  end
+    lock = lock 'file'
 
+    response = @request.put 'file', StringIO.new('string3'), testcreds
+    assert_equal '423', response.status
+
+    # having the lock token shouldn't allow you to write if you
+    # are not the lock owner
+    response = @request.put('file', StringIO.new('string4'),
+                            testcreds.merge(:if => lock.token))
+    assert_equal '423', response.status
+
+    # likewise for unlock if you do not have DAV:unlock privilege
+    response = @request.unlock 'file', lock.token, testcreds
+    assert_equal '403', response.status
+
+    grant_unlock = RubyDav::Ace.new :grant, test_principal_uri, false, :unlock
+    add_ace_and_set_acl 'file', grant_unlock
+
+    # should still not be able to write even if you have DAV:unlock
+    response = @request.put('file', StringIO.new('string5'),
+                            testcreds.merge(:if => lock.token))
+    assert_equal '423', response.status
+
+    # but you should now be able to unlock
+    response = @request.unlock 'file', lock.token, testcreds
+    assert_equal '204', response.status
+
+    delete_file 'file'
+  end
+   
   def failing_test_locking_privilege
     new_file 'lockfile'
 
