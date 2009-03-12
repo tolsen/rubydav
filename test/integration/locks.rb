@@ -5,6 +5,13 @@ require 'test/integration/webdavtestsetup'
 class WebDavLocksTest < Test::Unit::TestCase
   include WebDavTestSetup
 
+  def assert_empty_lockdiscovery file
+    response = @request.propfind file, 0, :lockdiscovery
+    assert_equal '207', response.status
+    assert_equal '200', response[:lockdiscovery].status
+    assert_equal({}, response[:lockdiscovery].lockdiscovery.locks)
+  end
+
   def assert_put_and_delete_requires_token(path, token,
                                            expected_put_status = '201')
     response = @request.put path, test_stream
@@ -50,6 +57,8 @@ class WebDavLocksTest < Test::Unit::TestCase
   # Create a file, lock it, unlock it and then delete it
   def test_lock_unlock
     setup_file
+
+    assert_empty_lockdiscovery 'file'
     
     # get an exclusive write lock
     owner = "<D:href xmlns:D='DAV:'>http://tim.limebits.com/</D:href>"
@@ -70,14 +79,28 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.lock 'file'
     assert_equal '423', response.status
     
-    # assert that it can't be deleted while still locked
-    response = @request.delete('file')
-    assert_equal '423', response.status
-
     response = @request.unlock('file', lock.token)
     assert_equal '204', response.status
-  ensure
-    teardown_file
+
+    # a second unlock should return 409
+    response = @request.unlock('file', lock.token)
+    assert_equal '409', response.status
+
+    response = @request.delete 'file'
+    assert_equal '204', response.status
+  end
+
+  def test_lock_delete
+    setup_file
+
+    lock = lock 'file'
+
+    # assert that it can't be deleted without lock token
+    response = @request.delete 'file'
+    assert_equal '423', response.status
+
+    response = @request.delete 'file', :if => lock.token
+    assert_equal '204', response.status
   end
 
   def test_lock_simple_if
@@ -110,6 +133,20 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     response = @request.unlock 'file', lock.token
     assert_equal '204', response.status
+
+    # should now be able to put & proppatch without a lock token
+
+    response = @request.put 'file', StringIO.new('string10')
+    assert_equal '204', response.status
+
+    response = @request.proppatch 'file', :displayname => 'newer name'
+    assert_equal '207', response.status
+    assert_equal '200', response[:displayname].status
+
+    response = @request.propfind 'file', 0, :displayname
+    assert_equal '207', response.status
+    assert_equal '200', response[:displayname].status
+    assert_equal 'newer name', response[:displayname].inner_value.strip
   ensure
     teardown_file
   end
@@ -151,12 +188,28 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '200', response[:lockdiscovery].status
     assert_equal [lock], response[:lockdiscovery].lockdiscovery.locks.values
 
-    assert_put_and_delete_requires_token 'col/file', lock.token, '204'
+    response = @request.put 'col/file', StringIO.new('string5')
+    assert_equal '423', response.status
+
+    response = @request.put 'col/file', StringIO.new('string5'), :if => lock.token
+    assert_equal '204', response.status
 
     # CURRENTLY FAILING
 #    assert_put_and_delete_requires_token 'col/file2', lock.token
 
     response = @request.unlock 'col', lock.token
+    assert_equal '204', response.status
+
+    assert_empty_lockdiscovery 'col/file'
+    
+    # should now be able to able to put & delete without a lock token
+    response = @request.put 'col/file', StringIO.new('string10')
+    assert_equal '204', response.status
+
+    response = @request.put 'col/file2', StringIO.new('string11')
+    assert_equal '201', response.status
+
+    response = @request.delete 'col/file2'
     assert_equal '204', response.status
   ensure
     teardown_col
