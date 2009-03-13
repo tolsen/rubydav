@@ -40,9 +40,9 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '201', response.status
   end
 
-  def setup_file
-    @request.delete('file')
-    response = @request.put('file', @stream)
+  def setup_file file = 'file'
+    @request.delete(file)
+    response = @request.put(file, @stream)
     assert_equal '201', response.status
   end
 
@@ -50,8 +50,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     @request.delete 'col'
   end
 
-  def teardown_file
-    @request.delete 'file'
+  def teardown_file file = 'file'
+    @request.delete file
   end
   
   # Create a file, lock it, unlock it and then delete it
@@ -80,8 +80,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.lock 'file'
     assert_equal '423', response.status
     
-    response = @request.unlock('file', lock.token)
-    assert_equal '204', response.status
+    unlock 'file', lock.token
 
     # a second unlock should return 409
     response = @request.unlock('file', lock.token)
@@ -132,8 +131,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '200', response[:displayname].status
     assert_equal 'new name', response[:displayname].inner_value.strip
 
-    response = @request.unlock 'file', lock.token
-    assert_equal '204', response.status
+    unlock 'file', lock.token
 
     # should now be able to put & proppatch without a lock token
 
@@ -150,6 +148,23 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal 'newer name', response[:displayname].inner_value.strip
   ensure
     teardown_file
+  end
+
+  def test_wrong_locktoken
+    setup_file 'file1'
+    setup_file 'file2'
+
+    lock1 = lock 'file1'
+    lock2 = lock 'file2'
+
+    response = @request.put 'file1', test_stream, :if => lock2.token
+    assert ['412', '423'].include?(response.status)
+
+    unlock 'file1', lock1.token
+    unlock 'file2', lock2.token
+  ensure
+    teardown_file 'file1'
+    teardown_file 'file2'
   end
 
   def test_lock_expired
@@ -180,8 +195,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # CURRENTLY FAILING
 #    assert_put_and_delete_requires_token 'col/file2', lock.token
 
-    response = @request.unlock 'col', lock.token
-    assert_equal '204', response.status
+    unlock 'col', lock.token
   ensure
     teardown_col
   end
@@ -209,10 +223,7 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     { 'col/file' => lock1,
       'col' => lock2,
-      'col/file2' => lock3 }.each do |f, l|
-      response = @request.unlock f, l.token
-      assert_equal '204', response.status
-    end
+      'col/file2' => lock3 }.each { |f, l| unlock f, l.token }
   ensure
     teardown_col
   end
@@ -243,9 +254,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # CURRENTLY FAILING
 #    assert_put_and_delete_requires_token 'col/file2', lock.token
 
-    response = @request.unlock 'col', lock.token
-    assert_equal '204', response.status
-
+    unlock 'col', lock.token
     assert_empty_lockdiscovery 'col/file'
     
     # should now be able to able to put & delete without a lock token
@@ -270,8 +279,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put('locknull', StringIO.new("test"), :if => if_hdr)
     assert_equal '201', response.status
 
-    response = @request.unlock('locknull', lock.token)
-    assert_equal '204', response.status
+    unlock('locknull', lock.token)
 
     response = @request.get('locknull')
     assert_equal '200', response.status
@@ -323,8 +331,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_not_nil response["#{@uri.path}locknull"]
 
-    response = @request.unlock('locknull', lock.token)
-    assert_equal '204', response.status
+    unlock('locknull', lock.token)
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_nil response["#{@uri.path}locknull"]
@@ -342,8 +349,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # get another shared lock
     lock2 = lock 'locknull', :scope => :shared, :depth => 0
 
-    response = @request.unlock('locknull', lock2.token)
-    assert_equal '204', response.status
+    unlock('locknull', lock2.token)
 
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_not_nil response["#{@uri.path}locknull"]
@@ -352,9 +358,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.unlock('locknull', lock2.token)
     assert_equal '409', response.status # Sec 9.11.1 of draft 18
 
-    response = @request.unlock('locknull', lock1.token)
-    assert_equal '204', response.status
-    
+    unlock('locknull', lock1.token)
+
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_nil response["#{@uri.path}locknull"]
   end
@@ -376,8 +381,7 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     assert locknull_response[:"resource-id"].inner_value.strip.length > 0
 
-    response = @request.unlock('locknull', lock.token)
-    assert_equal '204', response.status
+    unlock('locknull', lock.token)
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_nil response["#{@uri.path}locknull"]
@@ -393,8 +397,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.move('locknull', 'nulllock')
     assert_equal '404', response.status
 
-    response = @request.unlock('locknull', lock.token)
-    assert_equal '204', response.status
+    unlock('locknull', lock.token)
     
     response = @request.propfind '', 1, :"current-user-privilege-set"
     assert_nil response["#{@uri.path}locknull"]
@@ -503,14 +506,12 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal([shared_lock1.token, shared_lock2.token].sort,
                  response[:lockdiscovery].lockdiscovery.locks.keys.sort)
 
-    response = @request.unlock('file', shared_lock2.token)
-    assert_equal '204', response.status
+    unlock('file', shared_lock2.token)
 
     response = @request.delete('file')
     assert_equal '423', response.status
 
-    response = @request.unlock('file', shared_lock1.token)
-    assert_equal '204', response.status
+    unlock('file', shared_lock1.token)
   ensure
     teardown_file
   end
@@ -645,8 +646,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_exists 'httplock/hr/archives/resumes/'
 
     # cleanup
-    response = @request.unlock('httplock/hr', lock.token)
-    assert_equal '204', response.status
+    unlock('httplock/hr', lock.token)
     delete_coll('httplock')
   end
 
@@ -676,10 +676,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal archives_lock, archives_lock2
 
     # cleanup
-    response = @request.unlock('httplock/hr/recruiting/resumes', resumes_locktoken)
-    assert_equal '204', response.status
-    response = @request.unlock('httplock/hr/archives', archives_locktoken)
-    assert_equal '204', response.status
+    unlock('httplock/hr/recruiting/resumes', resumes_locktoken)
+    unlock('httplock/hr/archives', archives_locktoken)
     delete_coll 'httplock'
   end
   
@@ -708,10 +706,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_hr_move_response '201', good_if
 
     # cleanup
-    response = @request.unlock('httplock/hr/recruiting/resumes', resumes_locktoken)
-    assert_equal '204', response.status
-    response = @request.unlock('httplock/hr/archives', archives_locktoken)
-    assert_equal '204', response.status
+    unlock('httplock/hr/recruiting/resumes', resumes_locktoken)
+    unlock('httplock/hr/archives', archives_locktoken)
     delete_coll 'httplock'
   end
   
@@ -754,10 +750,8 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status 
 
     # cleanup
-    response = @request.unlock('httplock/a', a_locktoken)
-    assert_equal '204', response.status
-    response = @request.unlock('httplock/b', b_locktoken)
-    assert_equal '204', response.status
+    unlock('httplock/a', a_locktoken)
+    unlock('httplock/b', b_locktoken)
     delete_coll('httplock')
   end
 
@@ -778,8 +772,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
 
     # cleanup
-    response = @request.unlock('httplock/hr/recruiting/resumes/', resumes_locktoken)
-    assert_equal '204', response.status
+    unlock('httplock/hr/recruiting/resumes/', resumes_locktoken)
     delete_coll 'httplock'
   end
 
@@ -804,8 +797,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     # CURRENTLY FAILING
     #assert_in_delta 10000, lock2.timeout, 50
 
-    response = @request.unlock 'file', lock1.token
-    assert_equal '204', response.status
+    unlock 'file', lock1.token
   ensure
     teardown_file
   end
@@ -842,6 +834,11 @@ class WebDavLocksTest < Test::Unit::TestCase
     new_file 'httplock/hr/recruiting/resumes/tom', StringIO.new('genius')
     new_file 'httplock/hr/recruiting/resumes/dick', StringIO.new('one of a kind')
     new_file 'httplock/hr/recruiting/resumes/harry', StringIO.new('moron')
+  end
+
+  def unlock file, token
+    response = @request.unlock file, token
+    assert_equal '204', response.status
   end
 
 end
