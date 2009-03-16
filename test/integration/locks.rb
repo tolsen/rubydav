@@ -111,6 +111,13 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     response = @request.lock 'file', :scope => :listerine
     assert_equal '422', response.status
+
+    # expects 400 instead of 422 because depth is a header
+    response = @request.lock 'file', :depth => 1
+    assert_equal '400', response.status
+
+    response = @request.lock 'file', :timeout => 'BadTimeout'
+    assert_equal '400', response.status
   ensure
     teardown_file
   end
