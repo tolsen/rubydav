@@ -12,6 +12,19 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal({}, response[:lockdiscovery].lockdiscovery.locks)
   end
 
+  def assert_proper_supportedlock file = 'file'
+    response = @request.propfind file, 0, :supportedlock
+    assert_equal '207', response.status
+    assert_equal '200', response[:supportedlock].status
+    supportedlock = response[:supportedlock].supportedlock
+
+    assert_equal 2, supportedlock.entries.size
+    assert(supportedlock.entries.all? { |e| e.type == :write })
+    [ :shared, :exclusive ].each do |scope|
+      assert(supportedlock.entries.any? { |e| e.scope == scope })
+    end
+  end
+  
   def assert_put_and_delete_requires_token(path, token,
                                            expected_put_status = '201')
     response = @request.put path, test_stream
@@ -798,6 +811,18 @@ class WebDavLocksTest < Test::Unit::TestCase
     #assert_in_delta 10000, lock2.timeout, 50
 
     unlock 'file', lock1.token
+  ensure
+    teardown_file
+  end
+
+  # limestone specific
+  def test_supportedlock
+    setup_file
+    assert_proper_supportedlock
+    lock = lock 'file'
+    # locking should not change supportedlock property value
+    assert_proper_supportedlock
+    unlock 'file', lock.token
   ensure
     teardown_file
   end
