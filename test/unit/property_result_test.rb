@@ -17,15 +17,22 @@ class PropertyResultTestCase < RubyDavUnitTestCase
     @error_result = RubyDav::PropertyResult.new @displayname_pk, '404', nil, :error
 
 
+    @test_pk = RubyDav::PropKey.get 'DAV:', 'test'
     RubyDav::PropertyResult.define_class_reader :test_reader, TestClass, 'test'
   end
 
   def test_define_class_reader
     flexmock(TestClass).should_receive(:from_elem).with(:elem).
       once.and_return(:obj)
-    test_pk = RubyDav::PropKey.get 'DAV:', 'test'
-    result = RubyDav::PropertyResult.new test_pk, '200', :elem
+    result = RubyDav::PropertyResult.new @test_pk, '200', :elem
     assert_equal :obj, result.test_reader
+  end
+
+  def test_define_class_reader__raise_argument_error
+    flexmock(TestClass).should_receive(:from_elem).with(:elem).
+      once.and_raise(ArgumentError)
+    result = RubyDav::PropertyResult.new @test_pk, '200', :elem
+    assert_raises(RubyDav::BadResponseError) { result.test_reader }
   end
 
   def test_define_class_reader__wrong_prop_key

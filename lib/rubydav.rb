@@ -29,6 +29,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/property_result'
   require File.dirname(__FILE__) + '/rubydav/response'
   require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
+  require File.dirname(__FILE__) + '/rubydav/supported_lock'
   require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/webdav'
 
