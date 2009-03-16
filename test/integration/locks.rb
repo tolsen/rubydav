@@ -103,6 +103,18 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
+  def failing_test_lock_bad_request
+    setup_file
+
+    response = @request.lock 'file', :type => :read
+    assert_equal '422', response.status
+
+    response = @request.lock 'file', :scope => :listerine
+    assert_equal '422', response.status
+  ensure
+    teardown_file
+  end
+
   def test_lock_delete
     setup_file
 
