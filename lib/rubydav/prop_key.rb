@@ -61,6 +61,8 @@ module RubyDav
       return @name <=> other.name if @ns == other.ns
       return @ns <=> other.ns
     end
+
+    alias_method :eql?, :==
       
     def dav?
       @ns == "DAV:"

@@ -88,11 +88,25 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "DAV:", "myproperty"
     
-    assert_equal false, propkey1==propkey2
-    assert_equal true, propkey1==propkey1
-    assert_equal true, propkey1.eql?(propkey1)
+    assert !(propkey1==propkey2)
+    assert propkey1==propkey1
+    assert propkey1.eql?(propkey1)
   end
-  
+
+  # Although PropKey follows a flyweight pattern, it is currently
+  # possible to get different ids if a PropKey is marshalled out and back
+  # we emulate that here by using send to call new()
+  def test_equality__different_ids
+    pk1 = RubyDav::PropKey.send :new, 'DAV:', 'myprop'
+    pk2 = RubyDav::PropKey.send :new, 'DAV:', 'myprop'
+
+    assert_not_equal pk1.object_id, pk2.object_id
+    assert (pk1 == pk2)
+    assert (pk2 == pk1)
+    assert pk1.eql?(pk2)
+    assert pk2.eql?(pk1)
+  end
+    
   def test_dav?
     propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
