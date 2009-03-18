@@ -2,6 +2,15 @@ require 'test/unit/unit_test_helper'
 
 class RubyDavPropKeyTest < RubyDavUnitTestCase
 
+  def generate_and_assert_propkey_xml propkey, expected_xml
+    assert (normalized_rexml_equal expected_xml, propkey.printXML)
+  end
+  
+  def generate_and_assert_propkey_xml_with_value propkey, value, expected_xml
+    propkey_xml = propkey.printXML nil, value
+    assert normalized_rexml_equal(expected_xml, propkey_xml)
+  end
+  
   def test_compare
     pk1 = RubyDav::PropKey.get 'ns_a', 'name1'
     pk2 = RubyDav::PropKey.get 'ns_b', 'name2'
@@ -14,74 +23,12 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     assert pk1 < pk4
   end
   
-  def test_get
-    propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace","myprop"
-    assert_instance_of RubyDav::PropKey, propkey
-  end
+  def test_dav?
+    propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
+    propkey2 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
 
-  def test_get__fails_when_name_has_right_brace
-    assert_raises(RuntimeError) { RubyDav::PropKey.get 'ns', 'foo}bar' }
-  end
-
-  def test_get_gives_different_objects
-    propkey1 = RubyDav::PropKey.get "namespace", "name"
-    propkey2 = RubyDav::PropKey.get "namespacen", "ame"
-    assert_not_equal propkey1, propkey2
-  end
-  
-  def test_get_gives_same_object
-    propkey1 = RubyDav::PropKey.get "DAV:","myprop"
-    propkey2 = RubyDav::PropKey.get "DAV:","myprop"
-    assert_equal true, propkey1.object_id == propkey2.object_id
-  end
-  
-  def test_ns
-    propkey = RubyDav::PropKey.get "DAV:","myprop"
-    assert_not_nil propkey.ns
-    assert_equal "DAV:", propkey.ns
-  end
-  
-  def test_name
-    propkey = RubyDav::PropKey.get "DAV:","myprop"
-    assert_not_nil propkey.name
-    assert_equal "myprop", propkey.name
-  end
-  
-  def test_name_symbol
-    propkey = RubyDav::PropKey.get "DAV:",:myprop
-    assert_not_nil propkey.name
-    assert_equal "myprop", propkey.name
-  end
-  
-  def test_register_symbol
-    propkey1 = RubyDav::PropKey.get "http://www.example.org/mynamespace",:myprop
-    propkey1.register_symbol(:myprop)
-    
-    propkey2 = RubyDav::PropKey.strictly_prop_key :myprop
-    
-    assert_equal true, propkey1.object_id == propkey2.object_id
-  end
-  
-  def test_strictly_prop_key
-    propkey1 = RubyDav::PropKey.get "http://www.example.org/mynamespace",:myprop
-    propkey1.register_symbol :myprop
-    
-    propkey2 = RubyDav::PropKey.strictly_prop_key :myprop
-    assert_equal true, propkey1.object_id == propkey2.object_id
-    
-    propkey2 = RubyDav::PropKey.strictly_prop_key propkey1
-    assert_equal true, propkey1.object_id == propkey2.object_id
-  end
-  
-  def test_strictly_prop_key_with_new_symbol
-    propkey = RubyDav::PropKey.strictly_prop_key :property
-    assert_equal "property", propkey.name
-    assert_equal "DAV:", propkey.ns
-  end
-  
-  def test_to_s
-    propkey = RubyDav::PropKey.get "DAV:", "myprop"
-    assert_equal "{DAV:}myprop", propkey.to_s
+    assert !propkey2.dav?
+    assert propkey1.dav?
   end
   
   def test_equality
@@ -107,12 +54,25 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     assert pk2.eql?(pk1)
   end
     
-  def test_dav?
-    propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
-    propkey2 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
+  def test_get
+    propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace","myprop"
+    assert_instance_of RubyDav::PropKey, propkey
+  end
 
-    assert !propkey2.dav?
-    assert propkey1.dav?
+  def test_get__fails_when_name_has_right_brace
+    assert_raises(RuntimeError) { RubyDav::PropKey.get 'ns', 'foo}bar' }
+  end
+
+  def test_get__gives_different_objects
+    propkey1 = RubyDav::PropKey.get "namespace", "name"
+    propkey2 = RubyDav::PropKey.get "namespacen", "ame"
+    assert_not_equal propkey1, propkey2
+  end
+  
+  def test_get__gives_same_object
+    propkey1 = RubyDav::PropKey.get "DAV:","myprop"
+    propkey2 = RubyDav::PropKey.get "DAV:","myprop"
+    assert_equal true, propkey1.object_id == propkey2.object_id
   end
   
   def test_hash
@@ -128,14 +88,22 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     assert_not_equal propkey1.hash, propkey4.hash
   end
 
-  def generate_and_assert_propkey_xml propkey, expected_xml
-    assert (normalized_rexml_equal expected_xml, propkey.printXML)
+  def test_name
+    propkey = RubyDav::PropKey.get "DAV:","myprop"
+    assert_not_nil propkey.name
+    assert_equal "myprop", propkey.name
   end
   
-  def test_printXML_with_DAV
-    propkey = RubyDav::PropKey.get "DAV:", "myprop"
-    expected_xml = "<D:myprop xmlns:D='DAV:'/>"
-    generate_and_assert_propkey_xml propkey, expected_xml
+  def test_name__symbol
+    propkey = RubyDav::PropKey.get "DAV:",:myprop
+    assert_not_nil propkey.name
+    assert_equal "myprop", propkey.name
+  end
+  
+  def test_ns
+    propkey = RubyDav::PropKey.get "DAV:","myprop"
+    assert_not_nil propkey.ns
+    assert_equal "DAV:", propkey.ns
   end
   
   def test_printXML
@@ -144,20 +112,53 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     generate_and_assert_propkey_xml propkey, expected_xml
   end
   
-  def generate_and_assert_propkey_xml_with_value propkey, value, expected_xml
-    propkey_xml = propkey.printXML nil, value
-    assert normalized_rexml_equal(expected_xml, propkey_xml)
+  def test_printXML__with_DAV
+    propkey = RubyDav::PropKey.get "DAV:", "myprop"
+    expected_xml = "<D:myprop xmlns:D='DAV:'/>"
+    generate_and_assert_propkey_xml propkey, expected_xml
   end
   
-  def test_printXML_with_value_with_DAV
+  def test_printXML__with_value
+    propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
+    expected_xml = "<R:myprop xmlns:R=\"http://www.example.org/mynamespace\">myvalue</R:myprop>"
+    generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml
+  end
+
+  def test_printXML__with_value_with_DAV
     propkey = RubyDav::PropKey.get "DAV:", "myprop"
     expected_xml = "<D:myprop xmlns:D='DAV:'>myvalue</D:myprop>"
     generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml
   end
   
-  def test_printXML_with_value
-    propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
-    expected_xml = "<R:myprop xmlns:R=\"http://www.example.org/mynamespace\">myvalue</R:myprop>"
-    generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml
+  def test_register_symbol
+    propkey1 = RubyDav::PropKey.get "http://www.example.org/mynamespace",:myprop
+    propkey1.register_symbol(:myprop)
+    
+    propkey2 = RubyDav::PropKey.strictly_prop_key :myprop
+    
+    assert_equal true, propkey1.object_id == propkey2.object_id
   end
+  
+  def test_strictly_prop_key
+    propkey1 = RubyDav::PropKey.get "http://www.example.org/mynamespace",:myprop
+    propkey1.register_symbol :myprop
+    
+    propkey2 = RubyDav::PropKey.strictly_prop_key :myprop
+    assert_equal true, propkey1.object_id == propkey2.object_id
+    
+    propkey2 = RubyDav::PropKey.strictly_prop_key propkey1
+    assert_equal true, propkey1.object_id == propkey2.object_id
+  end
+  
+  def test_strictly_prop_key__with_new_symbol
+    propkey = RubyDav::PropKey.strictly_prop_key :property
+    assert_equal "property", propkey.name
+    assert_equal "DAV:", propkey.ns
+  end
+  
+  def test_to_s
+    propkey = RubyDav::PropKey.get "DAV:", "myprop"
+    assert_equal "{DAV:}myprop", propkey.to_s
+  end
+  
 end
