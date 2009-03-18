@@ -27,6 +27,16 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_equal '404', response.status
   end
 
+  def test_propfind_allprop_include
+    new_file 'file'
+    response = @request.propfind 'file', 0, :allprop, :'resource-id'
+    assert_equal '207', response.status
+    resource_id_pk = RubyDav::PropKey.get 'DAV:', 'resource-id'
+    assert response.resources["#{@uri.path}file"].include?(resource_id_pk)
+  ensure
+    delete_file 'file'
+  end
+
   def test_propfind_depth_infinity
     # create a resource tree to test depth infinity PROPFINDs
     #                        A
