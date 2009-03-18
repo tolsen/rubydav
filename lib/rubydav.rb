@@ -611,16 +611,16 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # props is either :allprop, :propname, or a list of propkeys/symbols eg.
       # :displayname, Propkey.get('http://example.org/mynamespace', 'author')
       #
-      # * propfind with :allprop, returns PropMultiResponse with all the
+      # * propfind with :allprop, returns PropstatResponse with all the
       #   properties and their values defined on the Request-URI
-      # * propfind with :propname, returns PropMultiResponse with all the defined
+      # * propfind with :propname, returns PropstatResponse with all the defined
       #   properties on the Request-URI
-      # * propfind with an array returns PropMultiResponse with the request
+      # * propfind with an array returns PropstatResponse with the request
       #   properties and their values for the Request-URI.
       #
       # For the corresponding value of depth all the descendents and their
       # respective properties and values are also reported. The response for the
-      # children of a URI are available by PropMultiResponse.children
+      # children of a URI are available by PropstatResponse.children
       #
       # options hash can be passed as the last element of props.
       def propfind(url, depth=INFINITY, *props)
@@ -650,7 +650,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       #   }
       #
       # Returns
-      # * PropMultiResponse with statuses containing
+      # * PropstatResponse with statuses containing
       #   * 200 OK, Note if one command succeeded then all succeed
       #   * Error Codes.
       # * appropriate error response
@@ -1080,25 +1080,24 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
           request.add_field req_key, req_value
         end
       end
+
+      def generate_props_xml xml, props
+        props.each { |p| PropKey.strictly_prop_key(p).printXML(xml) }
+      end
       
       def generate_propfind_bodystream *props
         return RubyDav.build_xml_stream do |xml|
           xml.D(:propfind, "xmlns:D" => "DAV:") do
-            if (props[0] == :allprop) || (props[0] == :propname)
-              xml.D(props[0])
+            if props.include? :propname
+              xml.D :propname
+            elsif props.include? :allprop
+              xml.D :allprop
+              remaining_props = props.reject { |p| p == :allprop }
+              xml.D(:include) do
+                generate_props_xml xml, remaining_props
+              end unless remaining_props.empty?
             else
-              xml.D(:prop) do
-                case props.first
-                when :acl, :"current-user-privilege-set" then
-                  xml.D(props[0])
-                else
-                  #output prop xml
-                  props.each do |prop|
-                    propkey = PropKey.strictly_prop_key(prop)
-                    propkey.printXML(xml)
-                  end
-                end
-              end
+              xml.D(:prop) { generate_props_xml xml, props }
             end
           end
         end

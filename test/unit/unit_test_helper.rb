@@ -14,7 +14,15 @@ class RubyDavUnitTestCase < RubyDavTestCase
 
     normalized_expected = REXML::Document.new(expected, document_context).to_s(ASSERT_REXML_INDENT)
     normalized_actual = REXML::Document.new(actual, document_context).to_s(ASSERT_REXML_INDENT)
-    normalized_expected == normalized_actual
+
+#     puts "EXPECTED"
+#     puts normalized_expected
+#     puts
+#     puts "ACTUAL" 
+#     puts normalized_actual
+#     puts
+    
+    return normalized_expected == normalized_actual
   end
   
   def create_ace_principal_xml principal
