@@ -33,6 +33,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/webdav'
 
+  require 'log4r'
   require 'shared-mime-info'
 
   # == What Is This Library?
@@ -436,12 +437,13 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   # On success, OkResponse with status 200 is returned else appropriate error
   # response
   #
+
   module RubyDav
     # Constant Infinity
     INFINITY = 1.0 / 0.0 unless defined? INFINITY
-    
+
     class Request
-      
+
       # Retrieves the information identified by the Request-URI
       # (only for non-collection resources)
       #
@@ -965,6 +967,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request.add_field('Authorization', auth.authorization(request.method, requesturl)) unless auth.nil?
 
         http_response = @connection_pool.request(uri, request)
+
+        @logger.debug { http_response.body }
         ResponseFactory.get(uri.path, http_response.code, http_response.to_hash,
                             http_response.body, httpmethod)
       end
@@ -1130,10 +1134,14 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # :password
       
       def initialize options = {}
-        options[:base_url] ||= ""
+        options = { :base_url => '', :log_level => 'INFO' }.merge options
         @global_opts = options
         @auth_world = AuthWorld.new
         @connection_pool = ConnectionPool.new
+
+        @logger = Log4r::Logger.new "RubyDav Request #{object_id}"
+        @logger.outputters = Log4r::Outputter.stdout
+        @logger.level = Log4r.const_get options[:log_level].upcase
       end
 
       def fullurl url
