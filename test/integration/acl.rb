@@ -25,6 +25,7 @@ class WebDavAclTest < Test::Unit::TestCase
     # get the file anonymously now
     response = @request.get('file')
     assert_equal '200', response.status
+    assert_equal 'public', response.headers["cache-control"][0]
     assert_equal @filebody, response.body
 
     # restore acl of file
@@ -42,6 +43,7 @@ class WebDavAclTest < Test::Unit::TestCase
     # authenticate and fetch one last time
     response = @request.get('file')
     assert_equal '200', response.status
+    assert_equal 'private', response.headers["cache-control"][0]
     assert_equal @filebody, response.body
 
     # cleanup
