@@ -1,5 +1,4 @@
 require 'test/unit/unit_test_helper'
-require 'test/propfind_acl_test_helper'
 require 'set'
 
 class ResponseTest < Test::Unit::TestCase
@@ -68,6 +67,101 @@ class ErrorResponseTest < Test::Unit::TestCase
   end
 end
 
+class OkLockResponseTest < Test::Unit::TestCase
+  def setup
+    @body = <<EOS
+<?xml version="1.0" encoding="utf-8" ?> 
+<D:prop xmlns:D="DAV:"> 
+  <D:lockdiscovery> 
+    <D:activelock> 
+      <D:locktype><D:write/></D:locktype> 
+      <D:lockscope><D:exclusive/></D:lockscope> 
+      <D:depth>infinity</D:depth> 
+      <D:owner> 
+        <D:href>http://example.org/~ejw/contact.html</D:href> 
+      </D:owner> 
+      <D:timeout>Second-604800</D:timeout> 
+      <D:locktoken> 
+        <D:href
+        >urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4</D:href> 
+      </D:locktoken> 
+      <D:lockroot> 
+        <D:href
+        >http://example.com/workspace/webdav/proposal.doc</D:href> 
+      </D:lockroot> 
+    </D:activelock> 
+  </D:lockdiscovery> 
+</D:prop>
+EOS
+    @locktoken = 'urn:uuid:e71d4fae-5dec-22d6-fea5-00a0c91e6be4'
+
+  end
+
+  def test_create
+    response = RubyDav::OkLockResponse.create('www.example.org', '200',
+                                              { 'lock-token' =>
+                                                ["<#{@locktoken}>"]},
+                                              @body, :lock)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_instance_of RubyDav::LockDiscovery, response.lock_discovery
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_equal @locktoken, response.lock_token
+    assert_equal [@locktoken], response.lock_discovery.locks.keys
+    
+    assert_equal 'www.example.org', response.active_lock.root
+  end
+
+  def test_create__without_lock_token_header
+    response = RubyDav::OkLockResponse.create('www.example.org', '200',
+                                              {}, @body, :lock)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_instance_of RubyDav::LockDiscovery, response.lock_discovery
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_nil response.lock_token
+    assert_equal [@locktoken], response.lock_discovery.locks.keys
+
+    assert_nil response.active_lock
+    assert_equal('http://example.com/workspace/webdav/proposal.doc',
+                 response.lock_discovery.locks.values[0].root)
+  end
+
+  def test_initialize
+    response = RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
+                                            { 'lock-token' =>
+                                              ["<#{@locktoken}>"]},
+                                            @body, :lock_discovery)
+    assert_instance_of RubyDav::OkLockResponse, response
+    assert_equal :lock_discovery, response.lock_discovery
+  end
+
+  def test_initialize__multiple_lock_token_headers
+    assert_raises RubyDav::BadResponseError do
+      RubyDav::OkLockResponse.send(:new, 'www.example.org', '200',
+                                   { 'lock-token' =>
+                                     [ '<token1>', '<token2>' ]},
+                                   @body, :lock_discovery)
+    end
+  end
+  
+  def test_parse_body
+    lock_discovery = RubyDav::OkLockResponse.parse_body @body
+    assert_instance_of RubyDav::LockDiscovery, lock_discovery
+  end
+
+  @@bad_bodies = {
+    :prop => '<notprop/>',
+    :lock_discovery =>
+    "<D:prop xmlns:D='DAV:'><notlockdiscovery/></D:prop>",
+  }
+
+  @@bad_bodies.each do |k, v|
+    define_method "test_parse_body__bad_#{k}" do
+      assert_raises(RubyDav::BadResponseError) { RubyDav::OkLockResponse.parse_body v }
+    end
+  end
+
+end
+
 class OkResponseTest < Test::Unit::TestCase
   def setup
     @body = "test body"
@@ -108,30 +202,27 @@ class MultiStatusResponseTest < RubyDavUnitTestCase
   end
 
   def test_responses
-    assert_equal 4, @responses.length
-    
-    assert_instance_of RubyDav::PreconditionFailedError, @responses[0]
-    assert_equal "http://www.example.org/othercontainer/R2/", @responses[0].url
-    
-    assert_instance_of RubyDav::PreconditionFailedError, @responses[1]
-    assert_equal "http://www.example.org/othercontainer/R3/", @responses[1].url
-    
-    assert_instance_of RubyDav::ForbiddenError, @responses[2]
-    assert_equal "http://www.example.org/othercontainer/R4/R5/", @responses[2].url
-    
-    assert_equal @response, @responses[3]
+    prefix = 'http://www.example.org/othercontainer/'
+    assert_equal 3, @responses.length
+
+    %w(R2/ R3/ R4/R5/).each do |suffix|
+      url = prefix + suffix
+      assert_equal url, @responses[url].href
+    end
+
+    assert_equal '412', @responses[prefix + 'R2/'].status
+    assert_equal '412', @responses[prefix + 'R3/'].status
+    assert_equal '403', @responses[prefix + 'R4/R5/'].status
   end
   
   def test_initialize
     responses = @responses.clone
-    headers = Hash.new
-    response = RubyDav::MultiStatusResponse.new(@url, '207', headers, @body, responses, :copy, "description")
+    response = RubyDav::MultiStatusResponse.new(@url, '207', {}, @body, responses, :copy, "description")
     
     assert_equal @url, response.url
     assert_equal '207', response.status
-    assert_equal headers, response.headers
+    assert_equal({}, response.headers)
     assert_equal @body, response.body
-    responses << response
     assert_equal responses, response.responses
     assert_equal "description", response.description
   end
@@ -139,11 +230,63 @@ end
 
 class MkcolResponseTest < RubyDavUnitTestCase
   def setup
+    super
     @url = "http://www.example.org/othercontainer"
     @body = @@response_builder.construct_mkcol_response([["200", nil, [["resourcetype","DAV:",nil],["email","http://limebits.com/ns/1.0/",nil]]]])
     @fail_body = @@response_builder.construct_mkcol_response([["424", nil, [["resourcetype","DAV:",nil]]],["403", nil, [["email","http://limebits.com/ns/1.0/",nil]]]])
     @response = RubyDav::MkcolResponse.create(@url,"201",{},@body,:mkcol_ext)
     @bad_response = RubyDav::MkcolResponse.create(@url,"424",{},@fail_body,:mkcol_ext)
+  end
+
+  def test_parse_body
+    response_str = <<EOS
+<D:mkcol-response xmlns:D="DAV:">
+  <D:propstat>
+    <D:prop>
+      <D:resourcetype/>
+      <D:displayname/>
+    </D:prop>
+    <D:status>HTTP/1.1 200 OK</D:status>
+  </D:propstat>
+</D:mkcol-response> 
+EOS
+
+    root = REXML::Document.new(response_str).root
+    resourcetype_prop = RubyDav::xpath_first root, 'propstat/prop/resourcetype'
+    displayname_prop = RubyDav::xpath_first root, 'propstat/prop/displayname'
+    
+
+    expected = {
+      '/home/special' => {
+        @displayname_pk =>
+        RubyDav::PropertyResult.new(@displayname_pk, '200', displayname_prop),
+        @resourcetype_pk =>
+        RubyDav::PropertyResult.new(@resourcetype_pk, '200', resourcetype_prop)
+      }
+    }
+    
+    actual =
+      RubyDav::MkcolResponse.send :parse_body, response_str, '/home/special'
+
+    assert_equal expected, actual
+  end
+    
+  def test_parse_body__bad_root
+    response_str = <<EOS
+<D:foo-response xmlns:D="DAV:">
+  <D:propstat>
+    <D:prop>
+      <D:resourcetype/>
+      <D:displayname/>
+    </D:prop>
+    <D:status>HTTP/1.1 200 OK</D:status>
+  </D:propstat>
+</D:foo-response> 
+EOS
+
+    assert_raises RubyDav::BadResponseError do
+      RubyDav::MkcolResponse.send :parse_body, response_str, '/home/special'
+    end
   end
   
   def test_simple
@@ -152,274 +295,320 @@ class MkcolResponseTest < RubyDavUnitTestCase
     assert_equal '201', @response.status
     assert @bad_response.error?
   end
-  
-  def test_prophash
-    prophash = {
-      RubyDav::PropKey.get("DAV:","resourcetype") => true,
-      RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => true
-    }
-    assert_equal prophash, @response.propertyhash
-  end
-  
-  def test_propertystatushash
-    propstathash = { 
-      RubyDav::PropKey.get("DAV:","resourcetype") => "200",
-      RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => "200"
-    }
-    assert_equal propstathash, @response.propertystatushash
-    propstathash = { 
-      RubyDav::PropKey.get("DAV:","resourcetype") => "424",
-      RubyDav::PropKey.get("http://limebits.com/ns/1.0/","email") => "403"
-    }
-    assert_equal propstathash, @bad_response.propertystatushash
-  end
-  
+
 end
 
-class PropMultiResponseTest < RubyDavUnitTestCase
-  @@body = nil
-  @@response = nil
+class PropstatResponseTest < RubyDavUnitTestCase
+
+  def assert_property_result prop, pk, result, status = '200', error = nil
+    element = REXML::XPath.first prop, pk.name, '' => pk.ns
+    assert_equal pk, result.prop_key
+    assert_equal status, result.status
+    assert_equal error, result.error
+    assert_equal element.to_s, result.element.to_s
+  end
+
+  def get_prop response, status = 'HTTP/1.1 200 OK'
+    REXML::XPath.first(response,
+                       "propstat/status[.='#{status}']/../prop",
+                       '' => 'DAV:')
+  end
+
+  def get_response root, url
+      REXML::XPath.first(root,
+                         "/multistatus/response/href[.='#{url}']/..",
+                         '' => 'DAV:')
+  end
+
+  def get_results props
+    results = {}
+    props.each do |pk, prop|
+      results[pk] = RubyDav::PropertyResult.new pk, '200', prop
+    end
+    return results
+  end
+
+  def expected_props prop_element, prop_keys
+    return prop_keys.inject({}) do |h, k|
+      h[k] = REXML::XPath.first(prop_element, "P:#{k.name}", 'P' => k.ns)
+      next h
+    end
+  end
   
   def setup
-    @url = "http://www.example.org/othercontainer"
-    @child1 = File.join(@url,"child1")
-    @child2 = File.join(@url,"child2")
-    @grandchild = File.join(@child2,"subchild1")
-    
-    responsehash = {}
-    responsehash[@url] = []
-    responsehash[@url] << ["200", nil, [["creationdate","DAV:","1997-12-01T18:27:21-08:00"],["prop1","DAV:","val1"]]]
-    responsehash[@url] << ["403", nil, [["bigbox","http://www.foo.bar/boxschema",""]]]
-    responsehash[@child1] = [["200", nil, [["prop1","DAV:","val1"]]]]
-    responsehash[@child2] = [["200", nil, [["prop1","DAV:","val1"]]]]
-    responsehash[@grandchild] = [["200", nil,[["prop1","DAV:","val1"]]]]
+    super
+    @propfind_response_str = <<EOS
+  <?xml version="1.0" encoding="utf-8" ?>
+  <D:multistatus xmlns:D="DAV:">
+    <D:response>
+      <D:href>/container/</D:href>
+      <D:propstat>
+        <D:prop xmlns:R="http://ns.example.com/boxschema/">
+          <R:bigbox><R:BoxType>Box type A</R:BoxType></R:bigbox>
+          <R:author><R:Name>Hadrian</R:Name></R:author>
+          <D:creationdate>1997-12-01T17:42:21-08:00</D:creationdate>
+          <D:displayname>Example collection</D:displayname>
+          <D:resourcetype><D:collection/></D:resourcetype>
+          <D:supportedlock>
+            <D:lockentry>
+              <D:lockscope><D:exclusive/></D:lockscope>
+              <D:locktype><D:write/></D:locktype>
+            </D:lockentry>
+            <D:lockentry>
+              <D:lockscope><D:shared/></D:lockscope>
+              <D:locktype><D:write/></D:locktype>
+            </D:lockentry>
+          </D:supportedlock>
+        </D:prop>
+        <D:status>HTTP/1.1 200 OK</D:status>
+      </D:propstat>
+    </D:response>
+    <D:response>
+      <D:href>/container/front.html</D:href>
+      <D:propstat>
+        <D:prop xmlns:R="http://ns.example.com/boxschema/">
+          <R:bigbox><R:BoxType>Box type B</R:BoxType>
+          </R:bigbox>
+          <D:creationdate>1997-12-01T18:27:21-08:00</D:creationdate>
+          <D:displayname>Example HTML resource</D:displayname>
+          <D:getcontentlength>4525</D:getcontentlength>
+          <D:getcontenttype>text/html</D:getcontenttype>
+          <D:getetag>"zzyzx"</D:getetag>
+          <D:getlastmodified
+            >Mon, 12 Jan 1998 09:25:56 GMT</D:getlastmodified>
+          <D:resourcetype/>
+          <D:supportedlock>
+            <D:lockentry>
+              <D:lockscope><D:exclusive/></D:lockscope>
+              <D:locktype><D:write/></D:locktype>
+            </D:lockentry>
+            <D:lockentry>
+              <D:lockscope><D:shared/></D:lockscope>
+              <D:locktype><D:write/></D:locktype>
+            </D:lockentry>
+          </D:supportedlock>
+        </D:prop>
+        <D:status>HTTP/1.1 200 OK</D:status>
+      </D:propstat>
+    </D:response>
+  </D:multistatus>
+EOS
 
-    @@body ||= @@response_builder.construct_multiprop_response(responsehash)
-    @@response ||= RubyDav::PropMultiResponse.create(@url,"207",{},@@body,:propfind)
-    
-    @response1 = @@response.children[File.basename(@child1)]
-    @response2 = @@response.children[File.basename(@child2)]
-    @response3 = @response2.children[File.basename(@grandchild)]
-  end
-  
-  def test_simple
-    assert_instance_of RubyDav::PropMultiResponse, @@response
-  end
+    propfind_response_root = REXML::Document.new(@propfind_response_str).root
+    @container_response = get_response propfind_response_root, '/container/'
+    @front_response =
+      get_response propfind_response_root, '/container/front.html'
 
-  def test_propertystatushash
-    propstathash = { 
-      prop1 => "200",
-      RubyDav::PropKey.get("DAV:","creationdate") => "200",
-      RubyDav::PropKey.get("http://www.foo.bar/boxschema","bigbox") => "403"
+    @container_prop = get_prop @container_response
+    @front_prop = get_prop @front_response
+    @props = {
+      '/container/' => @container_prop,
+      '/container/front.html' => @front_prop
     }
-    assert_equal propstathash, @@response.propertystatushash
-  end
-  
-  def test_propfind_propertyhash
-    prophash = {
-      prop1 => "val1",
-      RubyDav::PropKey.get("DAV:","creationdate") => "1997-12-01T18:27:21-08:00"
-    }
-    assert_equal prophash, @@response.propertyhash
-  end
-  
-  def test_propertyhash_reader
-    assert_equal "val1", @@response[prop1]
-    assert_equal "1997-12-01T18:27:21-08:00", @@response[:creationdate]
-    assert_nil @@response[RubyDav::PropKey.get("http://www.foo.bar/boxschema","bigbox")]
-  end
-  
-  def test_statuses
-    assert_equal "200", @@response.statuses(prop1)
-    assert_equal "200", @@response.statuses(:creationdate)
-    assert_equal "403", @@response.statuses(RubyDav::PropKey.get("http://www.foo.bar/boxschema","bigbox"))
-  end
 
-  def test_children
-    prophash = {prop1 => "val1"}
-    propstathash = {prop1 => "200"}
-    
-    assert_equal 2, @@response.children.length
-    assert_propmultiresponse_object(@response1, prophash, propstathash, 0)
-    assert_propmultiresponse_object(@response2, prophash, propstathash, 1)
-    assert_propmultiresponse_object(@response3, prophash, propstathash, 0)
-  end
+    @container_prop_keys =
+      [
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'author'),
+       RubyDav::PropKey.get('DAV:', 'creationdate'),
+       RubyDav::PropKey.get('DAV:', 'displayname'),
+       RubyDav::PropKey.get('DAV:', 'resourcetype'),
+       RubyDav::PropKey.get('DAV:', 'supportedlock')
+      ]
 
-  def test_parent
-    assert_equal nil, @@response.parent
-    assert_equal @@response, @response1.parent
-    assert_equal @@response, @response2.parent
-    assert_equal @response2, @response3.parent
-  end
-
-  def test_responses
-    assert_equal [@response1], @response1.responses
-    assert_equal [@response3], @response3.responses
-    assert_equal [@response3, @response2], @response2.responses
-    assert_equal 4, @@response.responses.length
-    
-    expected_response_set = [@@response, @response3, @response1, @response2].to_set
-    assert_equal expected_response_set, @@response.responses.to_set
-  end
-  
-  def test_proppatch_error
-    responsehash = {}
-    responsehash[@url] = []
-    responsehash[@url] << ["403", nil, [["prop1","DAV:",""]]]
-    responsehash[@url] << ["424", nil, [["prop2","DAV:",""]]]
-    
-    body = @@response_builder.construct_multiprop_response(responsehash)
-    response = RubyDav::PropMultiResponse.create(@url, "207", {}, body, :proppatch)
-    
-    prophash = {}
-    assert response.error?
-    assert_equal prophash, response.propertyhash
-  end
+    @front_prop_keys =
+      [
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
+       RubyDav::PropKey.get('DAV:', 'creationdate'),
+       RubyDav::PropKey.get('DAV:', 'displayname'),
+       RubyDav::PropKey.get('DAV:', 'getcontentlength'),
+       RubyDav::PropKey.get('DAV:', 'getcontenttype'),
+       RubyDav::PropKey.get('DAV:', 'getetag'),
+       RubyDav::PropKey.get('DAV:', 'getlastmodified'),
+       RubyDav::PropKey.get('DAV:', 'resourcetype'),
+       RubyDav::PropKey.get('DAV:', 'supportedlock')
+      ]
 
 
-  def test_proppatch_success
-    responsehash = {}
-    responsehash[@url] = []
-    responsehash[@url] << ["200", nil, [["prop1","DAV:",""],["prop2","DAV:",""]]]
-    
-    body = @@response_builder.construct_multiprop_response(responsehash)
-    response = RubyDav::PropMultiResponse.create(@url, "207", {}, body, :proppatch)
-    
-    prophash = {
-      prop1 => true,
-      prop2 => true
-    }
-    assert !response.error?
-    assert_equal prophash, response.propertyhash
+    @expected_container_props =
+      expected_props @container_prop, @container_prop_keys
+    @expected_front_props = expected_props @front_prop, @front_prop_keys
+
+    @expected_container_results = get_results @expected_container_props
+    @expected_front_results = get_results @expected_front_props
+
+    @response =
+      RubyDav::PropstatResponse.create('/container/', '207', {},
+                                       @propfind_response_str, :propfind)
+    @propfind2_response_str = <<EOS
+  <?xml version="1.0" encoding="utf-8" ?>
+  <D:multistatus xmlns:D="DAV:">
+    <D:response>
+      <D:href>/container2/</D:href>
+      <D:propstat>
+        <D:prop>
+          <D:displayname>Example collection</D:displayname>
+        </D:prop>
+        <D:status>HTTP/1.1 200 OK</D:status>
+      </D:propstat>
+      <D:propstat>
+        <D:prop>
+          <D:resourcetype/>
+        </D:prop>
+        <D:status>HTTP/1.1 401 Unauthorized</D:status>
+      </D:propstat>
+      <D:propstat>
+        <D:prop>
+          <D:supportedlock/>
+        </D:prop>
+        <D:status>HTTP/1.1 403 Forbidden</D:status>
+      </D:propstat>
+    </D:response>
+  </D:multistatus>
+EOS
+    @propfind2_response_root =
+      REXML::Document.new(@propfind2_response_str).root
+    @container2_response =
+      get_response @propfind2_response_root, '/container2/'
+    @container2_200_prop = get_prop @container2_response
+    @container2_401_prop = get_prop @container2_response, 'HTTP/1.1 401 Unauthorized'
+    @container2_403_prop = get_prop @container2_response, 'HTTP/1.1 403 Forbidden'
+
+    @supportedlock_pk = RubyDav::PropKey.get('DAV:', 'supportedlock')
+
+    @response2 =
+      RubyDav::PropstatResponse.create('/container2/', '207', {},
+                                       @propfind2_response_str, :propfind)
+
+    @propfind3_response_str = <<EOS
+<?xml version="1.0" encoding="utf-8" ?> 
+<D:multistatus xmlns:D="DAV:"> 
+  <D:response> 
+    <D:href>http://www.example.com/file</D:href> 
+    <D:propstat> 
+      <D:prop>
+        <D:displayname>A File</D:displayname>
+        <D:getcontentlength>555</D:getcontentlength>
+      </D:prop> 
+      <D:status>HTTP/1.1 200 OK</D:status> 
+    </D:propstat> 
+  </D:response> 
+</D:multistatus>
+EOS
+    propfind3_response_root = REXML::Document.new(@propfind3_response_str).root
+    file_response =
+      get_response propfind3_response_root, 'http://www.example.com/file'
+    file_prop = get_prop file_response
+    file_prop_keys = [@displayname_pk, @getcontentlength_pk]
+    expected_file_props = expected_props file_prop, file_prop_keys
+    @expected_file_results = get_results expected_file_props
+    @response3 =
+      RubyDav::PropstatResponse.create('http://www.example.com/file', '207', {},
+                                       @propfind3_response_str, :propfind)
+  end
+
+  # tests [] operator
+  def test_brackets__prop_key_multiple_urls
+    assert_raises(RuntimeError) { @response[@displayname_pk] }
+  end
+
+  def test_brackets__prop_key_single_url
+    assert_equal(@expected_file_results[@displayname_pk],
+                 @response3[@displayname_pk])
   end
   
+  def test_brackets__symbol_single_url
+    assert_equal(@expected_file_results[@displayname_pk],
+                 @response3[:displayname])
+  end
+  
+  def test_brackets__url
+    assert_equal @expected_container_results, @response['/container/']
+  end
+
+  def test_brackets__url_extra_slash
+    assert_equal @expected_front_results, @response['/container/front.html/']
+  end
+  
+  def test_brackets__url_missing_slash
+    assert_equal @expected_container_results, @response['/container']
+  end
+  
+
+  def test_create
+    assert_instance_of RubyDav::PropstatResponse, @response
+    assert_instance_of Hash, @response.resources
+  end
+
+  def test_error
+    assert !@response.error?
+    assert @response2.error?
+  end
+
   def test_parse_body
-    responsehash = {@url => [["200", nil, [["prop1","DAV:","value1"],["prop2","DAV:","value2"]]]]}
-    body = @@response_builder.construct_multiprop_response(responsehash)
-    urlhash = RubyDav::PropMultiResponse.parse_body body
+    urlhash = RubyDav::PropstatResponse.send(:parse_body,
+                                             @propfind_response_str,
+                                             '/container/')
+    expected_urls = ['/container/', '/container/front.html'].sort
+    assert_equal expected_urls, urlhash.keys.sort
 
-    assert_equal "200", urlhash["http://www.example.org/othercontainer"][0][0]
-    assert_equal 2, urlhash["http://www.example.org/othercontainer"][0][2].size
-    assert_xml_matches urlhash["http://www.example.org/othercontainer"][0][2][prop1].to_s do |xml|
-      xml.xmlns! 'DAV:'
-      xml.prop1 'value1'
+    assert_equal @container_prop_keys.sort, urlhash['/container/'].keys.sort
+    assert_equal @front_prop_keys.sort, urlhash['/container/front.html'].keys.sort
+
+    urlhash.each do |url, props|
+      props.each do |pk, result|
+        assert_property_result @props[url], pk, result
+      end
     end
-    
-    assert_xml_matches urlhash["http://www.example.org/othercontainer"][0][2][prop2].to_s do |xml|
-      xml.xmlns! 'DAV:'
-      xml.prop2 'value2'
+  end
+
+  def test_parse_body2
+    urlhash = RubyDav::PropstatResponse.send(:parse_body,
+                                             @propfind2_response_str,
+                                             '/container2/')
+    assert_equal ['/container2/'], urlhash.keys
+
+    container2_results = urlhash['/container2/']
+
+    expected_pks = [@displayname_pk, @resourcetype_pk, @supportedlock_pk].sort
+    assert_equal expected_pks, container2_results.keys.sort
+
+    assert_property_result(@container2_200_prop, @displayname_pk,
+                           container2_results[@displayname_pk], '200')
+    assert_property_result(@container2_401_prop, @resourcetype_pk,
+                           container2_results[@resourcetype_pk], '401')
+    assert_property_result(@container2_403_prop, @supportedlock_pk,
+                           container2_results[@supportedlock_pk], '403')
+  end
+  
+  def test_parse_propstats
+    actual =
+      RubyDav::PropstatResponse.send :parse_propstats, @container_response
+    assert_equal @expected_container_results, actual
+
+    # test hash defaulting of symbols
+    assert_equal(@expected_container_results[@displayname_pk],
+                 actual[:displayname])
+  end
+
+  def test_parse_propstats2
+    expected = {}
+    [[@displayname_pk, '200', @container2_200_prop],
+     [@resourcetype_pk, '401', @container2_401_prop],
+     [@supportedlock_pk, '403', @container2_403_prop]].each do |arr|
+      pk, status, prop_element = arr
+      prop = REXML::XPath.first prop_element, "P:#{pk.name}", 'P' => pk.ns
+      expected[pk] = RubyDav::PropertyResult.new pk, status, prop
     end
-    
-  end
-  
-  def test_createtree
-    responsehash = {@url => [["200", nil, [["prop1","DAV:",""],["prop2","DAV:",""]]]]}
-    body = @@response_builder.construct_multiprop_response(responsehash)
-    response1 = RubyDav::PropMultiResponse.create(@url, "207", {}, body, :proppatch)
-    assert_equal nil, response1.parent
-    
-    responsehash = {@child1 => [["200", nil, [["prop1","DAV:",""],["prop2","DAV:",""]]]]}
-    body = @@response_builder.construct_multiprop_response(responsehash)
-    response2 = RubyDav::PropMultiResponse.create(@child1, "207", {}, body, :proppatch)
-    assert_equal nil, response2.parent
-    
-    urlhash = { @url => response1, @child1 => response2 }
-    RubyDav::PropMultiResponse.createtree(urlhash)
-    
-    assert_equal response1, response2.parent
-    assert_equal 1, response1.children.size
-    assert_equal response2, response1.children[File.basename(@child1)]
-  end
-  
-  def test_initialize_defaults
-    headers = {}
-    prophash = {}
-    response = RubyDav::PropMultiResponse.new(@url, '207', headers, "fakebody")
-    assert_equal @url, response.url
-    assert_equal '207', response.status
-    assert_equal headers, response.headers
-    assert_equal "fakebody", response.body
-    assert_equal prophash, response.propertyhash
-    assert_equal prophash, response.propertystatushash
-    assert !response.error?
+
+    actual =
+      RubyDav::PropstatResponse.send :parse_propstats, @container2_response
+    assert_equal expected, actual
   end
 
-  def test_initialize
-    headers = {}
-    propertyhash = {prop1 => "val1"}
-    propertyfullhash = {prop1 => "<prop1 xmlns='DAV:'>val1</prop1>"}
-    propertystatushash = {prop1 => "200"}
-    response = RubyDav::PropMultiResponse.new(@url, '207', headers, "fakebody", propertyhash, propertystatushash, {}, propertyfullhash, true)
-    assert_equal @url, response.url
-    assert_equal '207', response.status
-    assert_equal headers, response.headers
-    assert_equal "fakebody", response.body
-    assert_equal propertyhash, response.propertyhash
-    assert_equal propertystatushash, response.propertystatushash
-    assert_equal propertyfullhash, response.propertyfullhash
-      
-    assert response.error?
+  def test_unauthorized
+    assert !@response.unauthorized?
+    assert @response2.unauthorized?
   end
-
-
-  def prop1() prop_n(1); end
-  def prop2() prop_n(2); end
-  def prop_n(n) RubyDav::PropKey.get("DAV:", "prop#{n}"); end
-  
-end
-
-class PropfindAclResponseTest < RubyDavUnitTestCase
-  include PropfindAclTestHelper
-  def get_response(url,body)
-    RubyDav::PropfindAclResponse.create(url,"207",{},body,:propfind_acl)
-  end
-end
-
-class PropfindCupsResponseTest < RubyDavUnitTestCase
-  @@body = nil
-  @@response = nil
-
-  def setup
-    @url = "http://www.example.org/othercontainer"
-    @child = File.join(@url,"child")
-    @grandchild = File.join(@child,"grandchild")
-    
-    responsehash = {}
-    responsehash[@url] = ["200", nil, ["read","write","read-acl"]]
-    responsehash[@child] = ["200", nil, ["read"]]
-    responsehash[@grandchild] = ["403", nil, []]
-
-    @@body ||= @@response_builder.construct_propfindcups_response(responsehash)
-    @@response ||= RubyDav::PropfindCupsResponse.create(@url,"207",{},@@body,:propfind_cups)
-  end
-
-  def test_privileges
-    assert_equal ["read", "write", "read-acl"], @@response.privileges
-  end
-  
-  def test_acl_status
-    assert_equal "200", @@response.cups_status
-  end
-
-  def test_children
-    response1 = @@response.children[File.basename(@child)]
-    response2 = response1.children[File.basename(@grandchild)]
-
-    assert_equal 1, @@response.children.length
-    
-    assert_propcupsresponse_object(response1, ["read"], "200", 1)
-    assert_propcupsresponse_object(response2, [], "403", 0)
-  end
-
-  def test_initialize
-    headers = {}
-    response = RubyDav::PropfindCupsResponse.new(@url, '207', headers, "fakebody",
-                                                 ["write", "read"], "200", nil)
-    assert_equal @url, response.url
-    assert_equal '207', response.status
-    assert_equal headers, response.headers
-    assert_equal "fakebody", response.body
-    assert_equal ["write", "read"], response.privileges
-    assert_equal '200', response.cups_status
-  end
+   
 end

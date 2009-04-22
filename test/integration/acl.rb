@@ -73,9 +73,9 @@ class WebDavAclTest < Test::Unit::TestCase
     new_file @testfile
 
     # get the acl 
-    @response = @request.propfind_acl('file', 0)
+    @response = @request.propfind 'file', 0, :acl
     assert !@response.error?
-    @acl = @response.acl
+    @acl = @response[:acl].acl.modifiable
   end
 
   def teardown_acl
@@ -169,12 +169,10 @@ class WebDavAclTest < Test::Unit::TestCase
     new_file 'file'
 
     # get a lock on the file
-    response = @request.lock('file', RubyDav::LockInfo.new)
-    assert_equal '200', response.status
-    lockinfo = response.lockinfo
+    lock = lock 'file'
 
     # try unlocking
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     # Must have failed with 403
     assert_equal '403', response.status
 
@@ -187,7 +185,7 @@ class WebDavAclTest < Test::Unit::TestCase
       acl << RubyDav::Ace.new(:deny, test_principal_uri, false, :all)
       acl << RubyDav::Ace.new(:grant, test_principal_uri, false, :unlock)
     end
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     assert_equal '403', response.status
     
     # correct the acl order and retry
@@ -195,7 +193,7 @@ class WebDavAclTest < Test::Unit::TestCase
       acl.reverse!
     end
 
-    response = @request.unlock('file', lockinfo.token, testcreds)
+    response = @request.unlock('file', lock.token, testcreds)
     assert_equal '204', response.status
 
     # cleanup
@@ -208,7 +206,7 @@ class WebDavAclTest < Test::Unit::TestCase
     expected_acl << RubyDav::Ace.new(:grant, test_principal_uri, false, 'read')
 
     assert_read_acl_related_privilege "read-acl" do |response|
-      assert_equal expected_acl, response.acl
+      assert_equal expected_acl, response[:acl].acl.modifiable
     end
   end
 
@@ -222,21 +220,10 @@ class WebDavAclTest < Test::Unit::TestCase
 
     response = @request.propfind('file', 0, sps_key)
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(sps_key)
+    assert_equal '200', response[sps_key].status
 
-    doc = REXML::Document.new(response.propertyhash[sps_key])
+    assert_not_nil response[sps_key].supported_privilege_set
 
-    # More specific xpath expresssions are not working!!
-    REXML::XPath.each(doc.root, "//*") do |element|
-      if element.name == "supported-privilege"
-        has_description = false
-        REXML::XPath.each(element) do |child|
-          has_description = true if child.name == "description"
-        end
-        assert has_description
-      end
-    end
-    
     delete_file 'file'
   end
 
@@ -255,20 +242,16 @@ class WebDavAclTest < Test::Unit::TestCase
 
     response = @request.proppatch(testfile, { tdp_key => hrefxml })
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(tdp_key)
+    assert_equal '200', response[tdp_key].status
 
     dav_property_ace = RubyDav::Ace.new(:grant, tdp_key, false, :read)
     acl = add_ace_and_set_acl testfile, dav_property_ace
     
     # verify that the ACL now contains the newly added DAV:property ACE
-    response = @request.propfind_acl(testfile, 0)
+    response = @request.propfind testfile, 0, :acl
     assert_equal '207', response.status
-    acl = response.acl
-    found_prop_ace = false
-    acl.each { |ace| if ace.principal == tdp_key 
-                       found_prop_ace = true 
-                     end }
-    assert found_prop_ace
+    acl = response[:acl].acl.modifiable
+    assert acl.any? { |ace| ace.principal == tdp_key }
 
     # check if test user can get the file now
     response = @request.get(testfile, testcreds)
@@ -280,7 +263,7 @@ class WebDavAclTest < Test::Unit::TestCase
     userhrefxml.D(:href, get_principal_uri(user))
     response = @request.proppatch(testfile, { tdp_key => userhrefxml })
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(tdp_key)
+    assert_equal '200', response[tdp_key].status
 
     # now test user should not be able to read the file
     response = @request.get(testfile, testcreds)
@@ -298,14 +281,10 @@ class WebDavAclTest < Test::Unit::TestCase
     acl = add_ace_and_set_acl principal_uri,  dav_self_ace
     
     # verify that the ACL now contains the newly added DAV:property ACE
-    response = @request.propfind_acl(principal_uri, 0)
+    response = @request.propfind principal_uri, 0, :acl
     assert_equal '207', response.status
-    acl = response.acl
-    found_self_ace = false
-    acl.each { |ace| if ace.principal == :self 
-                       found_self_ace = true 
-                     end }
-    assert found_self_ace
+    acl = response[:acl].acl.modifiable
+    assert acl.any? { |ace| ace.principal == :self }
 
     # restore the acl
     acl.shift
@@ -340,11 +319,11 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '409', response.status
     
     # test that the ACL did not change
-    response = @request.propfind_acl(@testfile, 0)
+    response = @request.propfind @testfile, 0, :acl
     assert_equal '207', response.status
-    assert @acl.eq? response.acl
+    assert_equal @acl, response[:acl].acl.modifiable
 
-    ensure
+  ensure
     teardown_acl
   end
 
@@ -353,8 +332,8 @@ class WebDavAclTest < Test::Unit::TestCase
     
     # test for no-protected-ace-conflict precondition
     # assuming server sets atleast one protected ace per resource
-    assert (!@response.protected_acl.nil?)
-    protected_acl = @response.protected_acl
+    protected_acl = @response[:acl].acl.protected
+    assert_not_nil protected_acl
     protected_ace = protected_acl.first
 
     # try to set an ace, conflicting with the proctected ace
@@ -438,7 +417,8 @@ class WebDavAclTest < Test::Unit::TestCase
   ensure
     teardown_acl
   end
-    
+
+  require 'pp'
   # this should probably be moved to acl_props.rb
   def test_child_read_for_propfind_depth_one
     
@@ -468,11 +448,13 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '207', response.status
 
     # ensure that we got 'file2' in the listing
-    assert response.children.include?('file2')
+    assert response.resources.include?(full_path(testfile2))
 
-    # the status associated with file2 must be 403
-    assert '403', response.children['file2'].status
-
+    # the statuses associated with file2 must be 403
+    response.resources[full_path(testfile2)].values.each do |r|
+      assert_equal '403', r.status
+    end
+    
     # cleanup
     delete_coll testcol
   end
@@ -482,26 +464,28 @@ class WebDavAclTest < Test::Unit::TestCase
     new_coll testcol
 
     rcups = :"read-current-user-privilege-set"
+    cups = :"current-user-privilege-set"
     
     # grant read, rcups & write
     ace = RubyDav::Ace.new(:grant, test_principal_uri, false, :read, rcups, :write)
     acl = add_ace_and_set_acl testcol, ace
 
     # get cups for 'test'
-    response = @request.propfind_cups(testcol, 0, testcreds)
+    response = @request.propfind testcol, 0, cups, testcreds
     assert_equal '207', response.status
-    assert_equal '200', response.cups_status
-    privileges = response.privileges
+    assert_equal '200', response[cups].status
+    privileges = response[cups].cups.privileges
 
     # ensure we got back read, rcups & write
-    assert privileges.include?('read')
-    assert privileges.include?('read-current-user-privilege-set')
-    assert privileges.include?('write')
+    assert privileges.include?(@privs[:read])
+    assert privileges.include?(@privs[:"read-cups"])
+    assert privileges.include?(@privs[:write])
 
     # both aggregate privileges and their contained privileges must be listed
-    # Also, from sec 3.12 RFC2518bis, write MUST contain bind, unbind, 
+    # Also, from sec 3.12 RFC3744, write MUST contain bind, unbind, 
     # write-properties and write-content.
-    write_privs = [ 'bind', 'unbind', 'write-properties', 'write-content']
+    write_privs =
+      @privs.values_at :bind, :unbind, :"write-properties", :"write-content"
     write_privs.each { |priv| assert privileges.include?(priv) }
 
     # now remove write privilege
@@ -511,15 +495,15 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '200', response.status
 
     # now, get cups for 'test'
-    response = @request.propfind_cups(testcol, 0, testcreds)
+    response = @request.propfind testcol, 0, cups, testcreds
     assert_equal '207', response.status
-    assert_equal '200', response.cups_status
-    privileges = response.privileges
+    assert_equal '200', response[cups].status
+    privileges = response[cups].cups.privileges
 
     # ensure we got back read, rcups but not write
-    assert privileges.include?('read')
-    assert privileges.include?('read-current-user-privilege-set')
-    assert !privileges.include?('write')
+    assert privileges.include?(@privs[:read])
+    assert privileges.include?(@privs[:"read-cups"])
+    assert !privileges.include?(@privs[:write])
 
     # also, ensure we did not get back any of the privileges contained in write
     write_privs.each { |priv| assert !privileges.include?(priv) }
@@ -594,9 +578,11 @@ class WebDavAclTest < Test::Unit::TestCase
     new_coll testcol
     new_file testfile
 
-    response = @request.propfind_acl(testfile, 0)
+    response = @request.propfind testfile, 0, :acl
     assert_equal '207', response.status
-    inherited_acl = response.inherited_acl
+
+    acl = response[:acl].acl
+    inherited_acl = acl.inherited
     
     # nothing to do if the resource has no inherited ace
     if inherited_acl.nil? 
@@ -648,9 +634,9 @@ class WebDavAclTest < Test::Unit::TestCase
   # helpers
 
   def modify_acl resource, &block
-    response = @request.propfind_acl(resource, 0)
+    response = @request.propfind resource, 0, :acl
     assert !response.error?
-    acl = response.acl
+    acl = response[:acl].acl.modifiable
     yield acl
     response = @request.acl(resource, acl)
     assert_equal '200', response.status
@@ -660,7 +646,7 @@ class WebDavAclTest < Test::Unit::TestCase
     new_file 'file'
 
     # try with no permissions
-    response = @request.propfind_acl('file', 0, testcreds)
+    response = @request.propfind 'file', 0, :acl, testcreds
 
     # test user didn't have :read privilege for propfind
     assert_equal '403', response.status
@@ -676,9 +662,9 @@ class WebDavAclTest < Test::Unit::TestCase
     end
     
     # retry with bad permissions
-    response = @request.propfind_acl('file', 0, testcreds)
+    response = @request.propfind 'file', 0, :acl, testcreds
     assert_equal '207', response.status
-    assert_equal '403', response.statuses(:acl)
+    assert_equal '403', response[:acl].status
 
     # change read-acl privilege from deny to grant
     modify_acl 'file' do |acl|
@@ -686,9 +672,9 @@ class WebDavAclTest < Test::Unit::TestCase
     end
     
     # retry with good permissions
-    response = @request.propfind_acl('file', 0, testcreds)
+    response = @request.propfind 'file', 0, :acl, testcreds
     assert_equal '207', response.status
-    assert_equal '200', response.statuses(:acl)
+    assert_equal '200', response[:acl].status
 
     yield response if block_given?
     
@@ -702,9 +688,10 @@ class WebDavAclTest < Test::Unit::TestCase
     response = @request.acl('/', RubyDav::Acl.new, admincreds)
     assert_equal '200', response.status
 
-    response1 = @request.propfind_acl('file', 0)
-    assert_equal '200', response1.statuses(:acl)
-    assert_equal 0, response1.acl.length
+    response1 = @request.propfind 'file', 0, :acl
+    result1 = response1[:acl]
+    assert_equal '200', result1.status
+    assert_equal 0, result1.acl.modifiable.length
 
     acl = RubyDav::Acl.new
     ace = RubyDav::Ace.new(:grant, :authenticated, false, 'read', 'read-current-user-privilege-set')
@@ -713,16 +700,17 @@ class WebDavAclTest < Test::Unit::TestCase
     response = @request.acl('/', acl, admincreds)
     assert_equal '200', response.status
     
-    response2 = @request.propfind_acl('file', 0)
-    assert_equal '200', response2.statuses(:acl)
+    response2 = @request.propfind 'file', 0, :acl
+    result2 = response2[:acl]
+    assert_equal '200', result2.status
 
     response = @request.acl('/', RubyDav::Acl.new, admincreds)
     assert_equal '200', response.status
 
-    assert_equal response1.protected_acl.length, response2.protected_acl.length
+    assert_equal result1.acl.protected.length, result2.acl.protected.length
 
-    assert_equal 0, response2.acl.length
-    assert_equal((response1.inherited_acl.length + 1), response2.inherited_acl.length)
+    assert_equal 0, result2.acl.modifiable.length
+    assert_equal (result1.acl.inherited.length + 1), result2.acl.inherited.length
 
     delete_file 'file'
   end

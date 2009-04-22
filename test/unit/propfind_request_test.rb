@@ -22,6 +22,26 @@ EOS
     assert_equal(response.status,"403")
   end
   
+  def test_propfind_allprop_include_request
+    body = <<EOS
+<?xml version="1.0" encoding="utf-8" ?>
+<D:propfind xmlns:D="DAV:">
+  <D:allprop/>
+  <D:include>
+    <D:acl/>
+    <D:resource-id/>
+  </D:include>
+</D:propfind>
+EOS
+    mresponse = mock_response("403")
+    flexstub(Net::HTTP).new_instances do |http|
+      http.should_receive(:request).with(on {|req| validate_propfind(req,RubyDav::INFINITY,body)}).and_return(mresponse)
+    end
+    response = RubyDav::Request.new.propfind(@url,RubyDav::INFINITY,:allprop,
+                                             :acl,:'resource-id')
+    assert_equal(response.status,"403")
+  end
+  
   def test_propfind_propname_request
     body = <<EOS
 <?xml version="1.0" encoding="utf-8" ?>
@@ -132,7 +152,7 @@ EOS
     (request.is_a?(Net::HTTP::Propfind)) &&
       (request.path == @url_path) &&
       (request['depth'].downcase == depth.to_s.downcase) &&
-      (normalized_rexml_equal(request.body_stream.read,body))
+      (normalized_rexml_equal(body, request.body_stream.read))
   end
   
 

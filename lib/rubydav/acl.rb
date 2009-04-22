@@ -1,6 +1,8 @@
 require 'set'
 
 require File.dirname(__FILE__) + '/prop_key'
+require File.dirname(__FILE__) + '/property_result'
+require File.dirname(__FILE__) + '/utility'
 
 module RubyDav
   
@@ -21,11 +23,7 @@ module RubyDav
     attr_reader :privileges
 
     def initialize(action, principal, isprotected, *privileges)
-      @privileges = Array.new
-      privileges.each do |priv|
-        priv = priv.to_sym unless (priv.is_a?(Symbol) || priv.is_a?(PropKey))
-        @privileges << priv
-      end
+      @privileges = self.class.normalize_privileges *privileges
       @isprotected = isprotected
       principal = PropKey.strictly_prop_key principal if ((Symbol === principal) &&
                                                           (principal != :all) &&
@@ -50,7 +48,7 @@ module RubyDav
         (@isprotected == other.protected?) &&
         (@privileges == other.privileges)
     end
-    alias eq? == 
+    alias eql? == 
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
@@ -82,13 +80,64 @@ module RubyDav
     end
     
     def addprivileges(privileges)
-      @privileges |= privileges
+      @privileges |= self.class.normalize_privileges(*privileges)
     end
 
     def to_s
       'Action: ' + @action.to_s + ' Principal: ' + @principal.to_s +
       ' Protected: ' + (@isprotected ? 'T':'F') + ' Privileges: ' +
       @privileges.inject(' ') {|privs, p| privs += p.to_s}
+    end
+
+    class << self
+
+      def from_elem elem
+        protected = !RubyDav::xpath_first(elem, 'protected').nil?
+        inherited_url =
+          RubyDav::xpath_first elem, 'inherited/href/text()'
+
+        principal_elem = RubyDav::xpath_first elem, 'principal'
+        raise 'no principal element found' if principal_elem.nil?
+        principal = parse_principal_element principal_elem
+
+        action_elem = RubyDav::xpath_first elem, 'grant|deny'
+        raise 'no grant or deny element found' if action_elem.nil?
+        action = action_elem.name.to_sym
+
+        privileges =
+          RubyDav::xpath_match(action_elem, 'privilege/*').map do |e|
+          PropKey.get e.namespace, e.name
+        end
+
+        if inherited_url.nil?
+          return Ace.new(action, principal, protected, *privileges)
+        else
+          return InheritedAce.new(inherited_url.to_s, action, principal,
+                                  protected, *privileges)
+        end
+      end
+
+      def normalize_privileges *privileges
+        privileges.map do |p|
+          p = p.to_sym if p.is_a? String
+          next PropKey.strictly_prop_key(p)
+        end
+      end
+
+      def parse_principal_element principal_elem
+        if (href = RubyDav::xpath_first principal_elem, 'href/text()')
+          return href.to_s
+        elsif (property = RubyDav::xpath_first principal_elem, 'property/*')
+          return PropKey.get(property.namespace, property.name)
+        else
+          %w(all authenticated unauthenticated self).each do |name|
+            property = RubyDav::xpath_first principal_elem, name
+            return name.to_sym unless property.nil?
+          end
+
+          raise "invalid principal element: #{principal_elem.to_s}"
+        end
+      end
     end
   end
   
@@ -165,6 +214,29 @@ module RubyDav
       (self.class == other.class) &&
         super(other)
     end
-    alias eq? == 
+    alias :eql? :==
+
+    def inherited
+      Acl[*select { |ace| ace.is_a? InheritedAce }]
+    end
+  
+    def modifiable
+      Acl[*reject { |ace| ace.is_a?(InheritedAce) || ace.protected? }]
+    end
+
+    def protected
+      Acl[*select { |ace| ace.protected? }]
+    end
+
+    class << self
+      
+      def from_elem elem
+        Acl[*RubyDav::xpath_match(elem, 'ace').map { |e| Ace.from_elem e }]
+      end
+      
+    end
+
+    PropertyResult.define_class_reader :acl, self, 'acl'
+    
   end
 end

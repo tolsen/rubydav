@@ -104,4 +104,37 @@ class RubyDavTestCase < Test::Unit::TestCase
     assert_equal cups_status, response.cups_status
   end
 
+  # properties is a hash from urls -> prop_keys -> inner_values
+  # statuses is a hash from urls -> prop_keys -> statuses
+  def assert_propstat_response response, properties, statuses
+    assert_instance_of RubyDav::PropstatResponse, response
+
+    assert_equal properties.keys.sort, statuses.keys.sort
+    assert_equal properties.keys.sort, response.resources.keys.sort
+
+    response.resources.each do |url, results|
+
+      successful_results = results.reject do |pk, r|
+        r.inner_value.nil? || r.inner_value.strip.empty?
+      end
+
+      successful_keys = successful_results.keys.sort
+      assert_equal properties[url].keys.sort, successful_keys
+
+      successful_keys.each do |pk|
+        assert_equal properties[url][pk], results[pk].inner_value
+      end
+
+      keys = results.keys.sort
+      assert_equal statuses[url].keys.sort, results.keys.sort
+
+      keys.each do |pk|
+        assert_equal statuses[url][pk], results[pk].status
+      end
+    end
+  end
+  
+      
+    
+    
 end

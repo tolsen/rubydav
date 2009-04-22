@@ -109,7 +109,7 @@ class WebDavBasicTest < Test::Unit::TestCase
     # ensure that propfind was successful
     assert_equal '207', propfind_response.status
     
-    initial_used_quota = propfind_response.propertyhash[quota_used_bytes].to_i
+    initial_used_quota = propfind_response[quota_used_bytes].inner_value.to_i
 
     session1 = Thread.new() do
       response1 = @request.put('bigfile', @bigstream)
@@ -134,15 +134,15 @@ class WebDavBasicTest < Test::Unit::TestCase
     assert_equal '207', propfind_response.status
 
     # get the filesize
-    gotsize = propfind_response.propertyhash[RubyDav::PropKey.get('DAV:', 'getcontentlength')].to_i
+    gcl_pk = RubyDav::PropKey.get 'DAV:', 'getcontentlength'
+    gotsize = propfind_response[gcl_pk].inner_value.to_i
 
     propfind_response = @request.propfind('',0, quota_used_bytes)
 
     # ensure that propfind was successful
     assert_equal '207', propfind_response.status
     
-    delta_quota = propfind_response.propertyhash[quota_used_bytes].to_i - initial_used_quota
-
+    delta_quota = propfind_response[quota_used_bytes].inner_value.to_i - initial_used_quota
 
 
     # Review with Paritosh: response1 is often 507 for me

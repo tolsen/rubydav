@@ -1,9 +1,10 @@
 require File.dirname(__FILE__) + '/acl'
-require File.dirname(__FILE__) + '/lock'
-require File.dirname(__FILE__) + '/rexml_fixes'
-require File.dirname(__FILE__) + '/errors'
-require File.dirname(__FILE__) + '/utility'
 require File.dirname(__FILE__) + '/dav_error'
+require File.dirname(__FILE__) + '/errors'
+require File.dirname(__FILE__) + '/lock_discovery'
+require File.dirname(__FILE__) + '/rexml_fixes'
+require File.dirname(__FILE__) + '/utility'
+require File.dirname(__FILE__) + '/sub_response'
 
 module RubyDav
 
@@ -101,44 +102,55 @@ module RubyDav
     attr_reader :description
     attr_reader :body
     
+    # hash of href -> SubResponse
+    attr_reader :responses
+    
     def error?
-      @method == :copy
+      @method == :copy || :lock
+    end
+
+    def unauthorized?
+      @unauthorized ||= responses.values.any? { |r| r.status == '401' }
+      return @unauthorized
     end
 
     def self.create(url,status,headers,body,method)
-      responses = Array.new
+      responses = {}
       root = REXML::Document.new(body).root
 
       raise BadResponseError unless (root.namespace == "DAV:" and root.name == "multistatus")
 
-      description = REXML::XPath.first(root, "D:responsedescription/text()", {"D" => "DAV:"}).to_s
-      response_elements = REXML::XPath.match(root, "D:response", {"D" => "DAV:"})
+      description = RubyDav.xpath_text root, 'responsedescription'
+      
+      response_elements = RubyDav.xpath_match root, "response"
       raise BadResponseError if response_elements.empty?
 
       response_elements.each do |response_element|
-        status_element = REXML::XPath.first(response_element, "D:status", {"D" => "DAV:"})
-        sub_status = RubyDav.parse_status(status_element.text)
+        sub_status_str = RubyDav.xpath_text response_element, "status"
+        sub_status = RubyDav.parse_status sub_status_str
+        error_elem = RubyDav.xpath_first response_element, 'error'
+        error = DavError.parse_dav_error error_elem
+        sub_description = RubyDav.xpath_text response_element, 'responsedescription'
+        location = RubyDav.xpath_text response_element, 'location'
         
-        hrefs = REXML::XPath.match(response_element, "D:href/text()", {"D" => "DAV:"})
-        responses += hrefs.map do |href|
-          ResponseFactory.get(href.to_s, sub_status, headers, nil, method)
+        hrefs = RubyDav.xpath_match response_element, "href/text()"
+        hrefs.each do |href|
+          raise BadResponseError if responses.include? href
+          responses[href.to_s] =
+            SubResponse.new href.to_s, sub_status, error, sub_description, location
         end
       end
       MultiStatusResponse.new(url, status, headers, body, responses, method, description)
     end
 
-    # returns list of responses inside MultiStatusResponse
-    attr_reader :responses
 
     private
     def initialize(url, status, headers, body, responses, method=nil, description=nil)
-      @responses = responses || Array.new
-      @responses << self
+      @responses = responses || {}
       @body = body
       @method = method
       @description = description
       super(url, status, headers)
-      @unauthorized = responses.any? { |r| r.unauthorized? } unless responses.nil?
     end
   end
 
@@ -162,53 +174,50 @@ module RubyDav
   class OkLockResponse < OkResponse #:nodoc:
     # returns the lock discovery info inside the response body of a successful
     # lock request
-    #
-    # lockinfo contains locktype, lockscope, depth, owner, timeout and
-    # locktoken
-    attr_reader :lockinfo
 
-    def self.parse_timeout(timeout)
-      timeout = timeout.text
-      timeout.split('-')[1] if timeout =~ /Second-/
-      INFINITY if timeout =~ /Infinite/
+    attr_reader :lock_discovery, :lock_token
+
+    # returns ActiveLock object for this request
+    def active_lock
+      return nil if @lock_token.nil?
+      return @lock_discovery.locks[@lock_token]
     end
 
-    def self.parse_locktoken(locktoken)
-      lthref = REXML::XPath.first(locktoken, "D:href", {"D" => "DAV:"})
-      lthref.text
+    class << self
+      
+      def create(url, status, headers, body, method)
+        lock_discovery = parse_body(body)
+
+        response = new url, status, headers, body, lock_discovery
+        active_lock = response.active_lock
+        active_lock.root = url unless active_lock.nil?
+        return response
+      end
+
+      def parse_body(body)
+        root = REXML::Document.new(body).root
+        ld_elem = RubyDav.xpath_first root, '/prop/lockdiscovery'
+        raise BadResponseError if ld_elem.nil?
+        return RubyDav::LockDiscovery.from_elem(ld_elem)
+      rescue ArgumentError
+        raise BadResponseError
+      end
+
     end
-
-    def self.parse_body(body)
-      root = REXML::Document.new(body).root
-      raise BadResponseError unless (root.namespace == "DAV:" && root.name == "prop")
-      lockdiscovery = REXML::XPath.first(root, "D:lockdiscovery", {"D" => "DAV:"})
-      activelock = REXML::XPath.first(lockdiscovery, "D:activelock", {"D" => "DAV:"})
-
-      locktype = REXML::XPath.first(activelock, "D:locktype", {"D" => "DAV:"})
-      lockscope = REXML::XPath.first(activelock, "D:lockscope", {"D" => "DAV:"})
-      depth = REXML::XPath.first(activelock, "D:depth", {"D" => "DAV:"})
-      owner = REXML::XPath.first(activelock, "D:owner", {"D" => "DAV:"})
-      timeout = REXML::XPath.first(activelock, "D:timeout", {"D" => "DAV:"})
-      locktoken = REXML::XPath.first(activelock, "D:locktoken", {"D" => "DAV:"})
-
-      RubyDav::LockInfo.new(:type => :"#{locktype.elements.to_s}",
-                            :scope => :"#{locktype.elements.to_s}",
-                            :depth => depth.text,
-                            :owner => owner.text,
-                            :timeout => parse_timeout(timeout),
-                            :token => parse_locktoken(locktoken)
-                            )
-    end
-
-    def self.create(url, status, headers, body, method)
-      lockinfo = parse_body(body)
-      lockinfo.root = url
-      self.new(url, status, headers, body, lockinfo)
-    end
-
+    
     private
-    def initialize(url, status, headers, body, lockinfo)
-      @lockinfo = lockinfo
+
+    def initialize(url, status, headers, body, lock_discovery)
+      @lock_discovery = lock_discovery
+
+      # Lock-Token header is not set on lock refreshes
+      if headers.include? 'lock-token'
+        lt_hdr_vals = headers['lock-token']
+        raise BadResponseError unless
+          lt_hdr_vals.is_a?(Array) && lt_hdr_vals.size == 1
+        @lock_token = lt_hdr_vals[0].sub /^\s*<(.*)>\s*$/, '\1'
+      end
+      
       super(url, status, headers, body)
     end
   end
@@ -234,12 +243,11 @@ module RubyDav
 
   # client error response class, 4xx series
   class ClientErrorResponse < ErrorResponse
-    include DavErrorHandler
     attr_reader :dav_error, :body
 
     def self.create(url, status, headers, body, method)
         root = REXML::Document.new(body).root
-        dav_error = DavErrorHandler.parse_dav_error(root)
+        dav_error = DavError.parse_dav_error(root)
         self.new(url, status, headers, body, dav_error)
     end
 
@@ -356,12 +364,11 @@ module RubyDav
   # on the resource because the server is unable to store the representation
   # needed to successfully complete the request.
   class InsufficientStorageError < ServerErrorResponse
-    include DavErrorHandler
     attr_reader :dav_error
 
     def self.create(url, status, headers, body, method)
         root = REXML::Document.new(body).root
-        dav_error = DavErrorHandler.parse_dav_error(root)
+        dav_error = DavError.parse_dav_error(root)
         self.new(url, status, headers, body, dav_error)
     end
 
@@ -387,417 +394,117 @@ module RubyDav
     end
   end
 
-
-  # For mulistatus responses that return individual DAV:response elements with
+  # For multistatus responses that return individual DAV:response elements with
   # DAV:propstat elements
   class PropstatResponse < MultiStatusResponse
-    include DavErrorHandler
-    attr_reader :propertyhash
-    attr_reader :propertystatushash
-    attr_reader :propertyerrorhash
-    attr_reader :propertyfullhash
+    
+    attr_reader :resources
 
-    # for a propfind, returns value if propkey was successfully found,
-    # otherwise returns nil (check statuses)
-    #
-    # for a proppatch, returns true if propkey successfully patched, otherwise
-    # nil.
-    def [](propkey)
-      @propertyhash[PropKey.strictly_prop_key(propkey)]
-    end
+    # if there is only one url, then you can just pass a prop_key,
+    #  and you will get a PropertyResult
+    # otherwise, you must pass in a url, and you will get a hash
+    #  of PropKey -> PropertyResult
+    def [] url_or_prop_key
+      if url_or_prop_key.is_a?(PropKey) || url_or_prop_key.is_a?(Symbol)
+        if resources.size == 1
+          return resources.values[0][url_or_prop_key]
+        else
+          raise("must pass url because there is " +
+                "more than one url in the response")
+        end
+      else
+        possible_keys =
+          [ url_or_prop_key, url_or_prop_key.chomp('/'),
+            "#{url_or_prop_key}/" ]
+        possible_keys.each do |k|
+          return resources[k] if resources.include? k
+        end
 
-    def include?(propkey)
-      @propertyhash.include? PropKey.strictly_prop_key(propkey)
-    end
-        
-    # returns status associated with propkey
-    def statuses(propkey)
-      @propertystatushash[PropKey.strictly_prop_key(propkey)]
-    end
-
-    # returns dav_error associated with propkey
-    def dav_errors(propkey)
-      @propertyerrorhash[PropKey.strictly_prop_key(propkey)]
+        return nil
+      end
     end
 
     def error?
-      @error
-    end
-
-
-    def initialize(url, status, headers, body, propertyhash={},
-                   propertystatushash={}, propertyerrorhash={},
-                   propertyfullhash={}, error=false)
-      @propertyhash = propertyhash
-      @propertystatushash = propertystatushash
-      @propertyerrorhash = propertyerrorhash
-      @propertyfullhash = propertyfullhash
-      @error = error
-      super(url, status, headers, body, nil)
-      @unauthorized = @propertystatushash.values.include? '401'
-    end
-
-    private
-    def self.parse_propstats response
-      propstats = REXML::XPath.match(response, "D:propstat", {"D" => "DAV:"})
-      propstats.each do |propstat|
-        status_elem = REXML::XPath.first(propstat, "D:status", {"D" => "DAV:"})
-        status = RubyDav.parse_status(status_elem.text)
-        dav_error_elem = REXML::XPath.first(propstat, "D:error", {"D" => "DAV:"})
-        dav_error = DavErrorHandler.parse_dav_error(dav_error_elem)
-        props =  parse_prop(REXML::XPath.first(propstat, "D:prop", {"D" => "DAV:"}))
-        yield(status, dav_error, props)
+      @error ||= @resources.values.any? do |properties|
+        properties.values.any? { |r| r.status !~ /^2\d\d$/ }
       end
     end
 
-    def self.parse_body(body)
-      root = REXML::Document.new(body).root
-      urlhash = {}
-      raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
-      responses = REXML::XPath.match(root, "D:response", {"D" => "DAV:"})
-      responses.each do |response|
-        href_elem = REXML::XPath.first(response, "D:href", {"D" => "DAV:"})
-        href = href_elem.text
+    def initialize(url, status, headers, body, resources)
+      super(url, status, headers, body, nil)
+      @resources = resources
+    end
 
-        propstats = REXML::XPath.match(response, "D:propstat", {"D" => "DAV:"})
-        urlhash[href] ||= []
-        self.parse_propstats(response) do |status, dav_error, props|
-          urlhash[href] << [status, dav_error, props]
+    def unauthorized?
+      @unauthorized ||= @resources.values.any? do |properties|
+        properties.values.any? { |r| r.status == '401' }
+      end
+      
+      return @unauthorized
+    end
+
+    class << self
+
+      def create(url, status, headers, body, method)
+        resources = parse_body body, url
+        return self.new(url, status, headers, body, resources)
+      end
+
+      private
+      
+      # returns a hash of PropKey -> PropertyResult
+      def parse_propstats parent_elem
+        properties = Hash.new { |h, k| h[PropKey.strictly_prop_key(k) ] }
+        
+        RubyDav.xpath_match(parent_elem, 'propstat').each do |ps_elem|
+          status_elem = RubyDav.xpath_first(ps_elem, 'status')
+          raise BadResponseError if status_elem.nil?
+          status = RubyDav.parse_status status_elem.text
+
+          dav_error_elem = RubyDav.xpath_first ps_elem, 'error'
+          dav_error = DavError.parse_dav_error dav_error_elem
+
+          RubyDav.xpath_first(ps_elem, 'prop').each_element do |property|
+            pk = PropKey.get(property.namespace, property.name)
+            result = PropertyResult.new pk, status, property, dav_error
+            properties[pk] = result
+          end
+        end
+
+        return properties
+      end
+
+      # returns hash of hashes: url -> PropKey -> PropertyResult
+      def parse_body body, url
+        root = REXML::Document.new(body).root
+        raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
+        return RubyDav.xpath_match(root, 'response').inject({}) do |h, r|
+          href_elem = RubyDav.xpath_first r, 'href'
+          raise BadResponseError if href_elem.nil?
+          href = href_elem.text
+          h[href] = parse_propstats r
+          next h
         end
       end
-      return urlhash
-    end
 
-    def self.parse_prop(prop_element)
-      prophash = {}
-      prop_element.each_element do |property|
-        propkey = PropKey.get(property.namespace, property.name)
-        prophash[propkey] = property
-      end
-      return prophash
     end
+    
 
   end
 
   class MkcolResponse < PropstatResponse
 
-    def self.create(url,status,headers,body,method)
-      root = REXML::Document.new(body).root
-      raise BadResponseError unless (root.namespace == "DAV:" && root.name == "mkcol-response")
-      response = REXML::XPath.match(root, "D:mkcol-response", {"D" => "DAV:"})
+    class << self
 
-      propertyhash = {}
-      propertystatushash = {}
-      propertyerrorhash = {}
-      propertyfullhash = {}
-      success = false
+      private
 
-      self.parse_propstats(root) do |sub_status, dav_error, props|
+      def parse_body body, url
+        root = REXML::Document.new(body).root
+        raise BadResponseError unless
+          (root.namespace == "DAV:" && root.name == "mkcol-response")
 
-        success = (sub_status == "200")
-        props.each_key do |prop|
-          propertystatushash[prop] = sub_status
-          propertyerrorhash[prop] = dav_error
-          propertyfullhash[prop] = propertyhash[prop] = true if success
-        end
+        return { url => parse_propstats(root) }
       end
-      MkcolResponse.new(url, status, headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, !success)
-    end
-  end
-
-  # prop multistatus response class, status 207
-  # response to a Propfind or a Proppatch
-  class PropMultiResponse < PropstatResponse
-
-    # returns parent PropMultiResponse
-    attr_reader :parent
-
-    # returns child PropMultiResponses.  Only defined for depth-1 or
-    # depth-infinity propfinds
-    attr_reader :children
-
-    def responses
-      @children.map { |bn, r| r.responses }.flatten << self
-    end
-
-    def unauthorized?
-      @unauthorized || @children.values.any? { |r| r.unauthorized? }
-    end
-
-    def self.create(url,status,headers,body,method)
-      urlhash = self.parse_body(body)
-      responsehash = {}
-      urlhash.each do |url, propstats|
-        propertyhash = {}
-        propertystatushash = {}
-        propertyerrorhash = {}
-        propertyfullhash = {}
-        success = false
-        propstats.each do |(sub_status, dav_error, properties)|
-          success = (sub_status == "200")
-          
-          properties.each_pair do |k, v|
-            propertyhash[k] = v.inner_xml if success
-            propertyfullhash[k] = v.to_s_with_ns
-          end if method == :propfind
-          
-          properties.each_key do |prop|
-            propertystatushash[prop] = sub_status
-            propertyerrorhash[prop] = dav_error
-            propertyfullhash[prop] = propertyhash[prop] = true if (success && method == :proppatch)
-          end
-        end
-        responsehash[RubyDav.uri_path(url)] = PropMultiResponse.new(url, '207', headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, !success)
-      end
-      createtree responsehash
-    end
-
-    def parent=(parentresponse)
-      @parent = parentresponse
-      parentresponse.children[File.basename(self.url)] = self
-    end
-
-    def initialize(url, status, headers, body, propertyhash={},
-                   propertystatushash={}, propertyerrorhash={},
-                   propertyfullhash={}, error=false)
-      @children = Hash.new
-      super url, status, headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, error
-    end
-
-    private
-    def self.createtree(urlresponsehash)
-      urlwithnoparent=nil
-      
-      urlresponsehash.each do |url,response|
-        parentresponse = urlresponsehash[File.dirname(url)]
-        
-        if (!parentresponse || parentresponse == response)
-          urlwithnoparent = url 
-        else
-          response.parent= parentresponse 
-        end
-      end
-      urlresponsehash[urlwithnoparent] if urlwithnoparent
-    end
-  end
-
-  # version-tree report response class, status 207
-  class VersionMultiResponse < PropstatResponse
-    attr_reader :versions
-
-    def self.create(url,status,headers,body,method)
-      urlhash = self.parse_body(body)
-      responsehash = {}
-      urlhash.each do |url, propstats|
-        propertyhash = {}
-        propertystatushash = {}
-        propertyerrorhash = {}
-        propertyfullhash = {}
-        success = false
-        propstats.each do |(sub_status, dav_error, properties)|
-          success = (sub_status == "200")
-          properties.each_pair do |k, v|
-            propertyhash[k] = v.inner_xml
-            propertyfullhash[k] = v.to_s_with_ns
-          end
-          properties.each_key do |prop|
-            propertystatushash[prop] = sub_status
-            propertyerrorhash[prop] = dav_error
-          end
-        end
-        responsehash[RubyDav.uri_path(url)] = PropstatResponse.new(url, '207', headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, !success)
-      end
-      self.new(url, status, headers, responsehash, method)
-    end
-
-    private
-    def initialize(url, status, headers, responsehash, method)
-      @versions = responsehash
-      super url, status, headers, body
-    end
-
-  end
-  
-  # response to an unsuccessful lock request (RubyDav.lock)
-  class LockMultiResponse < MultiStatusResponse #:nodoc:
-    # returns list of failed dependencies for the Lock request
-    def failed_dependencies
-    end
-
-    # Response object pertaining to the request URL that you failed to lock
-    def head
-    end
-  end
-
-
-  # response for RubyDav.propfind_acl
-  class PropfindAclResponse < PropMultiResponse
-
-    # aces inherited from other resources
-    # includes aces which are both inherited and protected
-    attr_reader :inherited_acl
-
-    # immutable (non-inherited) aces on the resource
-    attr_reader :protected_acl
-
-    # non-inherited and unprotected aces
-    attr_reader :acl
-
-    attr_reader :acl_status
-    attr_reader :dav_error
-
-    def self.create(url,status,headers,body,method)
-      urlhash = self.parse_body(body)
-      responsehash = {}
-      urlhash.each do |url,propstats|
-        inherited_acl,protected_acl,acl = *propstats[0][2][PropKey.get("DAV:", "acl")]
-        dav_error = *propstats[0][1]
-        acl_status = *propstats[0][0]
-        responsehash[RubyDav.uri_path(url)] = PropfindAclResponse.new(url, '207', headers, body, inherited_acl, 
-                                                                      protected_acl, acl, acl_status, dav_error)
-      end
-      createtree(responsehash)
-    end
-    
-    def initialize(url, status, headers, body, inherited_acl, protected_acl, acl,acl_status, dav_error)
-      @inherited_acl = inherited_acl
-      @protected_acl = protected_acl
-      @acl = acl
-      @acl_status = acl_status
-      @dav_error = dav_error
-
-      acl_key = PropKey.get("DAV:", "acl")
-      
-      propertystatushash = { acl_key => acl_status}
-      propertyerrorhash = { acl_key => dav_error}
-      propertyhash = { acl_key => [inherited_acl, protected_acl,acl]}
-      super(url, status, headers, body, propertyhash, propertystatushash, propertyerrorhash)
-    end
-
-    private
-    def self.parse_prop(prop_element)
-      inherited_acl = Acl.new
-      protected_acl = Acl.new
-      acl = Acl.new
-
-      ace_elements = REXML::XPath.match(prop_element, "D:acl/D:ace", {"D" => "DAV:"})
-      
-      ace_elements.each do |ace_element|
-        privileges = []
-        inheritedurl = ""
-        
-        principal_element = REXML::XPath.first(ace_element, "D:principal", {"D" => "DAV:"})
-        principal = parse_principal_element(principal_element)
-
-        grantdeny_element = REXML::XPath.first(ace_element, "D:grant|D:deny", {"D" => "DAV:"})
-        action = grantdeny_element.name.to_sym
-        
-        REXML::XPath.each(grantdeny_element, "D:privilege/*", {"D" => "DAV:"}) do |privilege|
-          priv = PropKey.get(privilege.namespace, privilege.name)
-          priv = privilege.name.to_sym if priv.dav?
-          privileges << priv
-        end
-        
-        protected = !REXML::XPath.first(ace_element, "D:protected", {"D" => "DAV:"}).nil?
-
-        inheritedurl = REXML::XPath.first(ace_element, "D:inherited/D:href/text()", {"D" => "DAV:"})
-        inherited = !inheritedurl.nil?
-
-
-        if inherited
-          inherited_acl << InheritedAce.new(inheritedurl.to_s, action, principal, protected, *privileges)
-        elsif protected
-          protected_acl << Ace.new(action, principal, protected, *privileges)
-        else
-          acl << Ace.new(action, principal, protected, *privileges)
-        end
-      end
-      return {PropKey.get("DAV:", "acl") => [inherited_acl, protected_acl, acl]}
-    end
-    
-    def self.parse_principal_element(principal_element)
-      href = REXML::XPath.first(principal_element, "D:href/text()", {"D" => "DAV:"})
-      href = href.to_s if href
-      property = REXML::XPath.first(principal_element, "D:property/*", {"D" => "DAV:"})
-      property = property && PropKey.get(property.namespace, property.name)
-      principal = href || property || principal_element.elements[1].name.to_sym
-    end
-  end
-
-  # response for RubyDav.propfind_cups
-  class PropfindCupsResponse < PropMultiResponse
-    # list of privileges that the current user has on the resource
-    attr_reader :privileges
-    
-    attr_reader :cups_status
-    attr_reader :dav_error
-
-    def self.create(url, status, headers, body, method)
-      urlhash = self.parse_body(body)
-      responsehash = {}
-      urlhash.each do |url, propstats|
-        privileges = propstats[0][2][PropKey.get("DAV:", "current-user-privilege-set")]
-        dav_error = propstats[0][1]
-        cups_status = propstats[0][0]
-        responsehash[RubyDav.uri_path(url)] = PropfindCupsResponse.new(url, '207', headers, body,
-                                                                       privileges, cups_status, dav_error)
-      end
-      createtree(responsehash)
-    end
-    
-    def initialize(url, status, headers, body, privileges, cups_status, dav_error)
-      @privileges = privileges
-      @cups_status = cups_status
-      @dav_error = dav_error
-      propertystatushash = {RubyDav::PropKey.get("DAV:", "current-user-privilege-set") => cups_status}
-      propertyerrorhash = {RubyDav::PropKey.get("DAV:", "current-user-privilege-set") => dav_error}
-      propertyhash = {RubyDav::PropKey.get("DAV:", "current-user-privilege-set") => privileges}
-      super(url, status, headers, body, propertyhash, propertystatushash, propertyerrorhash)
-    end
-
-    private
-
-    def self.parse_prop(prop_element)
-      privileges = []
-      REXML::XPath.each(prop_element, "D:current-user-privilege-set/D:privilege/*", {"D" => "DAV:"}) do |privilege|
-        privileges << privilege.name
-      end
-      return {PropKey.get("DAV:", "current-user-privilege-set") => privileges}
-    end
-    
-  end
-
-  class SearchResponse < MultiStatusResponse
-    attr_reader :responsehash
-
-    def self.create(url, status, headers, body, method)
-      urlhash = PropMultiResponse.parse_body(body)
-      responsehash = {}
-      urlhash.each do |url, propstats|
-        propertyhash = {}
-        propertystatushash = {}
-        propertyerrorhash = {}
-        propertyfullhash = {}
-        success = false
-        propstats.each do |(sub_status, dav_error, properties)|
-          success = (sub_status == "200")
-          properties.each_pair do |k, v|
-            propertyhash[k] = v.inner_xml
-            propertyfullhash[k] = v.to_s_with_ns
-          end
-          properties.each_key do |prop|
-            propertystatushash[prop] = sub_status
-            propertyerrorhash[prop] = dav_error
-          end
-        end
-        responsehash[RubyDav.uri_path(url)] = PropMultiResponse.new(url, '207', headers, body, propertyhash, propertystatushash, propertyerrorhash, propertyfullhash, !success)
-      end
-      SearchResponse.new(url, status, headers, body, responsehash, method)
-    end
-
-    def initialize(url, status, headers, body, urlresponsehash, method)
-      @responsehash = urlresponsehash
-      super(url, status, headers, body, @responsehash.values, method)
     end
   end
 
@@ -814,13 +521,11 @@ module RubyDav
       ['204', nil] => NoContentResponse,
       ['207', :copy] => MultiStatusResponse,
       ['207', :lock] => MultiStatusResponse,
-      ['207', :propfind] => PropMultiResponse,
-      ['207', :proppatch] => PropMultiResponse,
-      ['207', :search] => SearchResponse,
-      ['207', :propfind_cups] => PropfindCupsResponse,
-      ['207', :propfind_acl] => PropfindAclResponse,
-      ['207', :report_version_tree] => VersionMultiResponse,
-      ['207', :report_expand_property] => PropMultiResponse,
+      ['207', :propfind] => PropstatResponse,
+      ['207', :proppatch] => PropstatResponse,
+      ['207', :search] => PropstatResponse,
+      ['207', :report_version_tree] => PropstatResponse,
+      ['207', :report_expand_property] => PropstatResponse,
       ['207', nil] => MultiStatusResponse,
       ['301', nil] => MovedPermanentlyResponse,
       ['302', nil] => FoundResponse,

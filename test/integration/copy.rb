@@ -41,30 +41,26 @@ class WebDavCopyTest < Test::Unit::TestCase
     assert_equal '201', response.status
 
     # get the resource ids at collB before the copy
-    response = @request.propfind('collB', RubyDav::INFINITY, :"resource-id")
-    assert !response.error?
-
-    res_ids_before = Hash.new
-    response.responses.each {|resp| res_ids_before[resp.url.sub(@uri.path,'')] = resp[:"resource-id"] }
+    response_before = @request.propfind('collB', RubyDav::INFINITY, :"resource-id")
+    assert !response_before.error?
 
     # copy collA onto collB
     response = @request.copy('collA', 'collB', RubyDav::INFINITY, true)
     assert_equal '204', response.status
 
     # get the resource ids at collB after the copy
-    response = @request.propfind('collB', RubyDav::INFINITY, :"resource-id")
-    assert !response.error?
-
-    res_ids_after = Hash.new
-    response.responses.each {|resp| res_ids_after[resp.url.sub(@uri.path,'')] = resp[:"resource-id"] }
+    response_after = @request.propfind('collB', RubyDav::INFINITY, :"resource-id")
+    assert !response_after.error?
 
     # assert that the uuids are retained for these uris
     for uri in ['collB', 'collB/file', 'collB/subcoll']
-      assert_equal res_ids_before[uri], res_ids_after[uri]
+      assert_equal(response_before[@uri.path + uri][:"resource-id"],
+                   response_after[@uri.path + uri][:"resource-id"])
     end
 
-    assert_not_equal res_ids_before['collB/subcoll/file1'], res_ids_after['collB/subcoll/file']
-    assert res_ids_after['collB/subcoll/file1'].nil?
+    assert_not_equal(response_before["#{@uri.path}collB/subcoll/file1"][:"resource-id"],
+                     response_after["#{@uri.path}collB/subcoll/file"][:"resource-id"])
+    assert_nil response_after['collB/subcoll/file1']
 
     # cleanup
     response = @request.delete('collA', :depth => RubyDav::INFINITY)

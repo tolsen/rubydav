@@ -8,6 +8,23 @@ class WebDavBindsTest < Test::Unit::TestCase
     webdavtestsetup
   end
 
+  def test_propfind_allprop
+    new_file 'file'
+    
+    # allprop propfind should not return resource-id or parent-set
+    response = @request.propfind 'file', 0, :allprop
+    assert_equal '207', response.status
+
+    displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
+    assert response.resources["#{@uri.path}file"].include?(displayname_pk)
+    %w(resource-id parent-set).each do |propname|
+      pk = RubyDav::PropKey.get 'DAV:', propname
+      assert !(response.resources["#{@uri.path}file"].include? pk)
+    end
+  ensure
+    delete_file 'file'
+  end
+
   def test_rebind_collection_onto_parent
     col = 'col'
     response = @request.mkcol(col)

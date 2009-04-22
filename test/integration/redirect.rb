@@ -49,8 +49,8 @@ class WebDavRedirectTest < Test::Unit::TestCase
     # check the DAV:reftarget, DAV:redirect-lifetime properties
     response = @request.propfind('test-reftarget', 0, :reftarget, :"redirect-lifetime", :apply_to_redirect_ref => true)
     assert_equal '207', response.status
-    assert_xml_txt_equal '<D:href xmlns:D="DAV:">http://www.example.com</D:href>', response.propertyhash[reftarget_key]
-    assert_xml_txt_equal '<D:temporary xmlns:D="DAV:"/>', response.propertyhash[redirect_lifetime_key]
+    assert_xml_txt_equal '<D:href xmlns:D="DAV:">http://www.example.com</D:href>', response[reftarget_key].inner_value
+    assert_xml_txt_equal '<D:temporary xmlns:D="DAV:"/>', response[redirect_lifetime_key].inner_value
 
     # cleanup
     response = @request.delete('test-reftarget', :apply_to_redirect_ref => true)
@@ -69,8 +69,8 @@ class WebDavRedirectTest < Test::Unit::TestCase
     # check the DAV:reftarget, DAV:redirect-lifetime properties
     response = @request.propfind('test-update', 0, :reftarget, :"redirect-lifetime", :apply_to_redirect_ref => true)
     assert_equal '207', response.status
-    assert_xml_txt_equal '<D:href xmlns:D="DAV:">http://example.com</D:href>', response.propertyhash[reftarget_key]
-    assert_xml_txt_equal '<D:permanent xmlns:D="DAV:"/>', response.propertyhash[redirect_lifetime_key]
+    assert_xml_txt_equal '<D:href xmlns:D="DAV:">http://example.com</D:href>', response[reftarget_key].inner_value
+    assert_xml_txt_equal '<D:permanent xmlns:D="DAV:"/>', response[redirect_lifetime_key].inner_value
 
     # cleanup
     response = @request.delete('test-update', :apply_to_redirect_ref => true)

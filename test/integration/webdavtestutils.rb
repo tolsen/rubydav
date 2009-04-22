@@ -92,17 +92,18 @@ module WebDavTestUtils
   end
 
   def get_acl(resource, creds={})
-    response = @request.propfind_acl(resource, 0, creds)
+    response = @request.propfind resource, 0, :acl, creds
     assert_equal '207', response.status
-    response.acl
+    return response[:acl].acl.modifiable
   end
 
-  # lock resource and return lockinfo
-  def lock_resource(path, lockinfo=RubyDav::LockInfo.new, creds={})
-    response = @request.lock(path, lockinfo, creds)
+  # lock resource and return activelock
+  def lock path, options = {}
+    response = @request.lock path, options
     assert_equal '200', response.status
-    response.lockinfo
+    return response.active_lock
   end
+  
   
   def assert_dav_error(response_or_dav_error, condition)
     dav_error = if response_or_dav_error.kind_of?(RubyDav::Response)
@@ -141,4 +142,10 @@ module WebDavTestUtils
 
   end
 
+  def full_path relative_path
+    URI.parse(@host).path + relative_path
+  end
+  
+  def test_stream() StringIO.new('test'); end
+  
 end
