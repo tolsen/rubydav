@@ -209,8 +209,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     getlastmodified2 = response[glm_pkey].inner_value
 
     assert_not_equal getlastmodified1, getlastmodified2
-
-    # cleanup
+  ensure
     delete_file 'testfile'
   end
 
@@ -231,8 +230,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     creationdate2 = response[cdate_pkey].inner_value
 
     assert_equal creationdate1, creationdate2
-
-    # cleanup
+  ensure
     delete_file 'testfile'
   end
 
@@ -241,9 +239,8 @@ class WebDavPropsTest < Test::Unit::TestCase
     
     response = @request.propfind('testfile', 0, :displayname)
     assert_equal '207', response.status
-    assert_equal '', response[:displayname]
-
-    # cleanup
+    assert_equal '', response[:displayname].inner_value
+  ensure
     delete_file 'testfile'
   end
 
@@ -257,7 +254,7 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # add a property to the source
     response = @request.proppatch('a/b/c', {author_pkey => 'myname'})
-    assert response.propertyhash[author_pkey]
+    assert response[author_pkey].success?
 
     # move to destination
     response = @request.move('a', 'd')
@@ -265,19 +262,19 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # check that author is correct on the destination
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response.propertyhash[author_pkey].strip
+    assert_equal 'myname', response[author_pkey].inner_value
 
     # change the property values on the destination
     response = @request.proppatch('d/b/c', { author_pkey => 'dummyname', publisher_pkey => 'dummy'})
-    assert response.propertyhash[author_pkey]
-    assert response.propertyhash[publisher_pkey]
+    assert response[author_pkey].success?
+    assert response[publisher_pkey].success?
 
     # let's do it again. this time we'll overwrite
     ['a', 'a/b', 'a/b/c'].each { |url| assert_equal '201', @request.mkcol(url).status }
 
     # add a property to the source
     response = @request.proppatch('a/b/c', {author_pkey => 'newname'})
-    assert response.propertyhash[author_pkey]
+    assert response[author_pkey].success?
 
     # move to destination
     response = @request.move('a', 'd')
@@ -285,9 +282,9 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # make sure the props are right
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'newname',  response.propertyhash[author_pkey].strip
-    assert_nil response.propertyhash[publisher_pkey]
-
+    assert_equal 'newname',  response[author_pkey].inner_value
+    assert_nil response[publisher_pkey]
+  ensure
     delete_coll 'd'
   end
 
@@ -301,19 +298,20 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.proppatch('a/b/c', { author_pkey => 'myname'})
     assert_equal '207',response.status
-    assert response.propertyhash[author_pkey]
+    assert response[author_pkey].success?
     
     response = @request.copy('a', 'd')
     assert_equal '201', response.status
 
     # check that the property was copied over correctly
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response.propertyhash[author_pkey].strip
+    assert_equal 'myname', response[author_pkey].inner_value
 
     # change the property value on the destination
     response = @request.proppatch('d/b/c', { author_pkey => 'dummyname', publisher_pkey => 'dummy'})
-    assert response.propertyhash[author_pkey]
-    assert response.propertyhash[publisher_pkey]
+    assert_equal '207', response.status
+    assert response[author_pkey].success?
+    assert response[publisher_pkey].success?
 
     # copy over again, this time it'll overwrite
     response = @request.copy('a', 'd')
@@ -321,9 +319,9 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # test that the destination has the new property values
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response.propertyhash[author_pkey].strip
-    assert_nil response.propertyhash[publisher_pkey]
-
+    assert_equal 'myname', response[author_pkey].inner_value
+    assert_nil response[publisher_pkey]
+  ensure
     delete_coll 'a'
     delete_coll 'd'
   end
@@ -339,19 +337,19 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.proppatch('a/b/c', { author_pkey => 'myname'})
     assert_equal '207',response.status
-    assert response.propertyhash[author_pkey]
+    assert response[author_pkey].success?
     
     response = @request.copy('a', 'd')
     assert_equal '201', response.status
 
     # check that the property was copied over correctly
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response.propertyhash[author_pkey].strip
+    assert_equal 'myname', response[author_pkey].inner_value
 
     # change the property value on the destination
     response = @request.proppatch('d/b/c', { author_pkey => 'dummyname', publisher_pkey => 'dummy'})
-    assert response.propertyhash[author_pkey]
-    assert response.propertyhash[publisher_pkey]
+    assert response[author_pkey].success?
+    assert response[publisher_pkey].success?
 
     # copy over again, this time it'll overwrite
     response = @request.copy('a', 'd')
@@ -359,9 +357,9 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # test that the destination has the new property values
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response.propertyhash[author_pkey].strip
-    assert_nil response.propertyhash[publisher_pkey]
-
+    assert_equal 'myname', response[author_pkey].inner_value
+    assert_nil response[publisher_pkey]
+  ensure
     delete_coll 'a'
     delete_coll 'd'
   end
@@ -382,15 +380,15 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # check that displayname is correct on the destination
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'myname', response[:displayname].strip
+    assert_equal 'myname', response[:displayname].inner_value
 
     # change the property values on the destination
     response = @request.proppatch('d/b/c', { :displayname => 'dummyname' })
-    assert response[:displayname]
+    assert response[:displayname].success?
 
     # add a property to the source
     response = @request.proppatch('a/b/c', {:displayname => 'newname'})
-    assert response[:displayname]
+    assert response[:displayname].success?
 
     # move to destination
     response = @request.copy('a', 'd')
@@ -398,8 +396,8 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     # make sure the props are right
     response = @request.propfind('d/b/c', 0, :allprop)
-    assert_equal 'newname',  response[:displayname].strip
-
+    assert_equal 'newname',  response[:displayname].inner_value
+  ensure
     delete_coll 'a'
     delete_coll 'd'
   end

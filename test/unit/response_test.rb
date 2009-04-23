@@ -589,6 +589,9 @@ EOS
     # test hash defaulting of symbols
     assert_equal(@expected_container_results[@displayname_pk],
                  actual[:displayname])
+
+    # test hash with missing entry
+    assert_nil actual[:missing]
   end
 
   def test_parse_propstats2
