@@ -2,6 +2,7 @@ require 'test/unit/unit_test_helper'
 
 class AceTest < RubyDavUnitTestCase
   def setup
+    super
     @ace =  create_ace :grant, :all, true, "write", "read"
   end
   
@@ -45,7 +46,7 @@ class AceTest < RubyDavUnitTestCase
   
   def test_privileges
     assert_equal 2, @ace.privileges.size
-    assert_equal [:write,:read], @ace.privileges
+    assert_equal [@write_priv, @read_priv], @ace.privileges
   end
   
   def test_equality
@@ -113,11 +114,175 @@ class AceTest < RubyDavUnitTestCase
   
   def test_addprivileges
     assert_equal 2, @ace.privileges.size
-    assert_equal [:write,:read], @ace.privileges
+    assert_equal [@write_priv, @read_priv], @ace.privileges
     
     @ace.addprivileges([:"read-acl"])
     assert_equal 3, @ace.privileges.size
-    assert_equal [:write,:read,:"read-acl"], @ace.privileges
+    assert_equal [@write_priv, @read_priv, @read_acl_priv], @ace.privileges
+  end
+
+  def test_from_elem__bad_action
+    ace_str = <<EOS
+<ace xmlns='DAV:'>
+  <principal><href>foo</href></principal>
+  <hi><privilege><read/></privilege></hi>
+</ace>
+EOS
+    ace_elem = REXML::Document.new(ace_str).root
+    assert_raises RuntimeError do
+      RubyDav::Ace.from_elem ace_elem
+    end
+  end
+
+  def test_from_elem__deny
+    ace_str = <<EOS
+<D:ace xmlns:D='DAV:'> 
+  <D:principal> 
+    <D:href>http://www.example.com/groups/mrktng</D:href> 
+  </D:principal> 
+  <D:deny> 
+    <D:privilege><D:read/></D:privilege>
+  </D:deny> 
+</D:ace> 
+EOS
+    
+    ace_elem = REXML::Document.new(ace_str).root
+    ace = RubyDav::Ace.from_elem ace_elem
+    assert_instance_of RubyDav::Ace, ace
+
+    assert_instance_of String, ace.principal
+    assert_equal 'http://www.example.com/groups/mrktng', ace.principal
+
+    assert_equal :deny, ace.action
+    assert_equal [RubyDav::PropKey.get('DAV:', 'read')], ace.privileges
+
+    assert !ace.protected?
+  end
+
+  def test_from_elem__grant
+    ace_str = <<EOS
+<D:ace xmlns:D='DAV:'> 
+  <D:principal> 
+    <D:href
+    >http://www.example.com/acl/groups/maintainers</D:href> 
+  </D:principal>  
+  <D:grant> 
+    <D:privilege><D:read/></D:privilege> 
+    <D:privilege><D:write/></D:privilege> 
+  </D:grant> 
+</D:ace> 
+EOS
+    ace_elem = REXML::Document.new(ace_str).root
+    ace = RubyDav::Ace.from_elem ace_elem
+    assert_instance_of RubyDav::Ace, ace
+    
+    assert_instance_of String, ace.principal
+    assert_equal 'http://www.example.com/acl/groups/maintainers', ace.principal
+
+    assert_equal :grant, ace.action
+    expected_privs = [RubyDav::PropKey.get('DAV:', 'read'),
+                      RubyDav::PropKey.get('DAV:', 'write')]
+    
+    assert_equal expected_privs.sort, ace.privileges.sort
+    assert !ace.protected?
+  end
+
+  def test_from_elem__inherited
+    ace_str = <<EOS
+<D:ace xmlns:D='DAV:'> 
+  <D:principal><D:all/></D:principal> 
+  <D:grant> 
+    <D:privilege><D:read/></D:privilege>
+  </D:grant> 
+  <D:inherited> 
+    <D:href>http://www.example.com/top</D:href> 
+  </D:inherited> 
+</D:ace>
+EOS
+    
+    ace_elem = REXML::Document.new(ace_str).root
+    ace = RubyDav::Ace.from_elem ace_elem
+    assert_instance_of RubyDav::InheritedAce, ace
+
+    assert_instance_of Symbol, ace.principal
+    assert_equal :all, ace.principal
+
+    assert_equal :grant, ace.action
+    assert_equal [RubyDav::PropKey.get('DAV:', 'read')], ace.privileges
+
+    assert_equal 'http://www.example.com/top', ace.url
+    assert !ace.protected?
+  end
+
+  def test_from_elem__missing_principal
+    ace_str = <<EOS
+<ace xmlns='DAV:'>
+  <grant><privilege><read/></privilege></grant>
+</ace>
+EOS
+    ace_elem = REXML::Document.new(ace_str).root
+    assert_raises RuntimeError do
+      RubyDav::Ace.from_elem ace_elem
+    end
+  end
+
+  def test_from_elem__protected
+    ace_str = <<EOS
+<ace xmlns='DAV:'>
+  <principal><property><owner/></property></principal>
+  <grant><privilege><all/></privilege></grant>
+  <protected/>
+</ace>
+EOS
+    
+    ace_elem = REXML::Document.new(ace_str).root
+    ace = RubyDav::Ace.from_elem ace_elem
+    assert_instance_of RubyDav::Ace, ace
+    
+    assert_instance_of RubyDav::PropKey, ace.principal
+    assert_equal RubyDav::PropKey.get('DAV:', 'owner'), ace.principal
+
+    assert_equal :grant, ace.action
+
+    assert_equal [RubyDav::PropKey.get('DAV:', 'all')], ace.privileges
+    assert ace.protected?
+  end
+
+  def test_parse_principal_element__all
+    principal_str = "<principal xmlns='DAV:'><all/></principal>"
+    principal_elem = REXML::Document.new(principal_str).root
+
+    result = RubyDav::Ace.parse_principal_element principal_elem
+    assert_instance_of Symbol, result
+    assert_equal :all, result
+  end
+
+  def test_parse_principal_element__bad_principal
+    principal_str = "<principal xmlns='DAV:'><foo/></principal>"
+    principal_elem = REXML::Document.new(principal_str).root
+    
+    assert_raises RuntimeError do
+      RubyDav::Ace.parse_principal_element principal_elem
+    end
+  end
+  
+  def test_parse_principal_element__href
+    principal_str = "<principal xmlns='DAV:'><href>foo</href></principal>"
+    principal_elem = REXML::Document.new(principal_str).root
+
+    result = RubyDav::Ace.parse_principal_element principal_elem
+    assert_instance_of String, result
+    assert_equal 'foo', result
+  end
+  
+  def test_parse_principal_element__property
+    principal_str = "<principal xmlns='DAV:'><property><owner/></property></principal>"
+    principal_elem = REXML::Document.new(principal_str).root
+
+    result = RubyDav::Ace.parse_principal_element principal_elem
+    assert_instance_of RubyDav::PropKey, result
+    owner_pk = RubyDav::PropKey.get 'DAV:', 'owner'
+    assert_equal owner_pk, result
   end
   
   def create_ace action, principal, protected, *privileges
@@ -162,6 +327,17 @@ class AceTest < RubyDavUnitTestCase
   
   def test_printXML
     assert_ace_xml @ace, :all
+  end
+
+  def test_normalize_privileges
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(@read_priv, @write_priv))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(:read, :write))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges('read', 'write'))
+    assert_equal([@read_priv, @write_priv],
+                 RubyDav::Ace.normalize_privileges(@read_priv, :write))
   end
 
   def assert_ace_xml ace, principal, action = :grant
@@ -234,13 +410,46 @@ end
 
 class AclTest < RubyDavUnitTestCase
   def setup
+    super
+
+    acl_str = <<EOS
+<D:acl xmlns:D='DAV:'> 
+  <D:ace> 
+    <D:principal> 
+      <D:href
+      >http://www.example.com/acl/groups/maintainers</D:href> 
+    </D:principal>  
+    <D:grant> 
+      <D:privilege><D:write/></D:privilege> 
+    </D:grant> 
+  </D:ace> 
+  <D:ace> 
+    <D:principal> 
+      <D:all/> 
+    </D:principal> 
+    <D:grant> 
+      <D:privilege><D:read/></D:privilege>  
+    </D:grant> 
+  </D:ace> 
+</D:acl> 
+EOS
+    @acl_elem = REXML::Document.new(acl_str).root
+    
     @acl = RubyDav::Acl.new
     @ace = RubyDav::Ace.new :grant, :all, true, "read-acl"
     @iace = RubyDav::InheritedAce.new "http://www.example.org", :grant, :all, true, "read-acl"
+    @acl2 = RubyDav::Acl[@ace, @iace]
+  end
+
+  def test_array
+    assert_instance_of RubyDav::Acl, @acl2
+    assert_equal 2, @acl2.size
+    assert_equal @ace, @acl2[0]
+    assert_equal @iace, @acl2[1]
   end
   
   def test_create
-    assert_not_nil @acl
+    assert_instance_of RubyDav::Acl, @acl
   end
 
   def test_compact!
@@ -310,6 +519,20 @@ class AclTest < RubyDavUnitTestCase
     
     assert !(@acl == acl)
   end
+
+  def test_from_elem
+    acl = RubyDav::Acl.from_elem @acl_elem
+    assert_instance_of RubyDav::Acl, acl
+
+    expected_acl =
+      RubyDav::Acl[
+                   RubyDav::Ace.new(:grant,
+                                    'http://www.example.com/acl/groups/maintainers',
+                                    false, RubyDav::PropKey.get('DAV:', 'write')),
+                   RubyDav::Ace.new(:grant, :all, false,
+                                    RubyDav::PropKey.get('DAV:', 'read'))]
+    assert_equal expected_acl, acl
+  end
   
   def test_unshift_with_compacting_true
     @acl.compacting= true
@@ -318,29 +541,7 @@ class AclTest < RubyDavUnitTestCase
     @acl.unshift ace
     
     assert_equal 1, @acl.size
-    assert_equal [:read,:"read-acl"], @acl[0].privileges
-  end
-  
-  def test_unshift_with_compacting_true_and_inherited_ace
-    @acl.compacting= true
-    @acl.unshift @ace
-    @acl.unshift @iace
-    
-    assert_equal 2, @acl.size
-    assert_equal [:"read-acl"], @acl[0].privileges
-    assert_equal "http://www.example.org", @acl[0].url
-    assert_equal [:"read-acl"], @acl[1].privileges
-  end
-  
-  def test_unshift_with_compacting_false
-    @acl.compacting= false
-    @acl.unshift @ace
-    ace =  RubyDav::Ace.new :grant, :all, true, "read"
-    @acl.unshift ace
-    
-    assert_equal 2, @acl.size
-    assert_equal [:read], @acl[0].privileges
-    assert_equal [:"read-acl"], @acl[1].privileges
+    assert_equal [@read_priv, @read_acl_priv], @acl[0].privileges
   end
   
   def test_printXML
@@ -361,6 +562,34 @@ class AclTest < RubyDavUnitTestCase
     xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
     @acl.printXML xml
     assert (normalized_rexml_equal expected_body, acl_xml)
+  end
+
+  def test_property_result_class_reader
+    acl_result = RubyDav::PropertyResult.new @acl_pk, '200', @acl_elem
+    assert_instance_of RubyDav::Acl, acl_result.acl
+  end
+    
+
+  def test_unshift_with_compacting_true_and_inherited_ace
+    @acl.compacting= true
+    @acl.unshift @ace
+    @acl.unshift @iace
+    
+    assert_equal 2, @acl.size
+    assert_equal [@read_acl_priv], @acl[0].privileges
+    assert_equal "http://www.example.org", @acl[0].url
+    assert_equal [@read_acl_priv], @acl[1].privileges
+  end
+  
+  def test_unshift_with_compacting_false
+    @acl.compacting= false
+    @acl.unshift @ace
+    ace =  RubyDav::Ace.new :grant, :all, true, "read"
+    @acl.unshift ace
+    
+    assert_equal 2, @acl.size
+    assert_equal [@read_priv], @acl[0].privileges
+    assert_equal [@read_acl_priv], @acl[1].privileges
   end
 
 end

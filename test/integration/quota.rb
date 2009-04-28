@@ -14,8 +14,9 @@ class WebDavQuotaTest < Test::Unit::TestCase
 
     response = @request.proppatch(testfile, {quota_available_bytes_pkey => '1000'})
     assert_equal '207', response.status
-    assert_equal '403', response.statuses(quota_available_bytes_pkey)
-    assert_dav_error response.dav_errors(quota_available_bytes_pkey), "cannot-modify-protected-property"
+    assert_equal '403', response[quota_available_bytes_pkey].status
+    assert_dav_error(response[quota_available_bytes_pkey].error,
+                     "cannot-modify-protected-property")
 
     delete_file testfile
   end
@@ -142,13 +143,13 @@ class WebDavQuotaTest < Test::Unit::TestCase
   def quota_available_bytes(path, creds)
     response = @request.propfind(path, 0, quota_available_bytes_pkey, creds)
     assert_equal '207', response.status
-    response.propertyhash[quota_available_bytes_pkey].to_i
+    response[quota_available_bytes_pkey].inner_value.to_i
   end
 
   def quota_used_bytes(path=@host, creds={})
     response = @request.propfind(path, 0, quota_used_bytes_pkey, creds)
     assert_equal '207', response.status
-    response.propertyhash[quota_used_bytes_pkey].to_i
+    response[quota_used_bytes_pkey].inner_value.to_i
   end
 
   def quota_available_bytes_pkey

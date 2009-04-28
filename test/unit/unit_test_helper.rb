@@ -14,7 +14,15 @@ class RubyDavUnitTestCase < RubyDavTestCase
 
     normalized_expected = REXML::Document.new(expected, document_context).to_s(ASSERT_REXML_INDENT)
     normalized_actual = REXML::Document.new(actual, document_context).to_s(ASSERT_REXML_INDENT)
-    normalized_expected == normalized_actual
+
+#     puts "EXPECTED"
+#     puts normalized_expected
+#     puts
+#     puts "ACTUAL" 
+#     puts normalized_actual
+#     puts
+    
+    return normalized_expected == normalized_actual
   end
   
   def create_ace_principal_xml principal
@@ -74,6 +82,96 @@ EOS
     tmpfile = Tempfile.new 'rubydav_testx'
     tmpfile.close 
     tmpfile.path
+  end
+
+  def setup
+    super
+
+    supported_privilege_set_str = <<EOS
+<D:supported-privilege-set xmlns:D='DAV:'>
+  <D:supported-privilege>
+    <D:privilege><D:all/></D:privilege>
+   <D:abstract/>
+    <D:description xml:lang="en">
+      Any operation
+    </D:description>
+    <D:supported-privilege>
+      <D:privilege><D:read/></D:privilege>
+      <D:description xml:lang="en">
+        Read any object
+      </D:description>
+      <D:supported-privilege>
+        <D:privilege><D:read-acl/></D:privilege>
+        <D:abstract/>
+        <D:description xml:lang="en">Read ACL</D:description>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege> 
+          <D:read-current-user-privilege-set/>
+        </D:privilege>
+        <D:abstract/>
+        <D:description xml:lang="en">
+          Read current user privilege set property
+        </D:description>
+      </D:supported-privilege>
+    </D:supported-privilege>
+    <D:supported-privilege>
+      <D:privilege><D:write/></D:privilege>
+      <D:description xml:lang="en">
+        Write any object
+      </D:description>
+      <D:supported-privilege>
+        <D:privilege><D:write-acl/></D:privilege>
+        <D:description xml:lang="en">
+          Write ACL
+        </D:description>
+        <D:abstract/>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege><D:write-properties/></D:privilege>
+        <D:description xml:lang="en">
+          Write properties
+        </D:description>
+      </D:supported-privilege>
+      <D:supported-privilege>
+        <D:privilege><D:write-content/></D:privilege>
+        <D:description xml:lang="en">
+          Write resource content
+        </D:description>
+      </D:supported-privilege>
+    </D:supported-privilege>
+    <D:supported-privilege>
+      <D:privilege><D:unlock/></D:privilege>
+      <D:description xml:lang="en">
+        Unlock resource
+      </D:description>
+    </D:supported-privilege>
+  </D:supported-privilege>
+</D:supported-privilege-set>
+EOS
+
+    @supported_privilege_set_elem =
+      REXML::Document.new(supported_privilege_set_str).root
+
+    @all_priv = RubyDav::PropKey.get 'DAV:', 'all'
+    @read_priv = RubyDav::PropKey.get 'DAV:', 'read'
+    @read_cups_priv =
+      RubyDav::PropKey.get 'DAV:', 'read-current-user-privilege-set'
+    @read_acl_priv = RubyDav::PropKey.get 'DAV:', 'read-acl'
+    @write_priv = RubyDav::PropKey.get 'DAV:', 'write'
+    @write_acl_priv = RubyDav::PropKey.get 'DAV:', 'write-acl'
+    @write_content_priv = RubyDav::PropKey.get 'DAV:', 'write-content'
+    @write_properties_priv = RubyDav::PropKey.get 'DAV:', 'write-properties'
+    @unlock_priv = RubyDav::PropKey.get 'DAV:', 'unlock'
+
+    @acl_pk = RubyDav::PropKey.get 'DAV:', 'acl'
+    @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
+    @getcontentlength_pk = RubyDav::PropKey.get 'DAV:', 'getcontentlength'
+    @resourcetype_pk = RubyDav::PropKey.get 'DAV:', 'resourcetype'
+  end
+
+  def body_root_element body
+    return REXML::Document.new(body).root
   end
   
 end

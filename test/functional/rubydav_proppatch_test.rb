@@ -5,6 +5,7 @@ class RubyDavProppatchTest < RubyDavFunctionalTestCase
     super
     @url = File.join(@host,"myhome")
     @url_path = URI.parse(@url).path
+    @properties = { @url => {} }
   end
   
   def test_proppatch_response_failure
@@ -13,13 +14,14 @@ class RubyDavProppatchTest < RubyDavFunctionalTestCase
     responsehash[@url] << ["424", nil, [["myprop","DAV:",""], ["prop1","http://www.example.org/namespace",""]]]
     responsehash[@url] << ["409", nil, [["property1","DAV:",""]]] 
     body = @@response_builder.construct_multiprop_response(responsehash)
-    
+
     response = get_response_to_mock_proppatch_request("207",body)
-    assert_equal @url, response.url
-    propstatushash = {RubyDav::PropKey.get("DAV:","myprop") => "424",
-      RubyDav::PropKey.get("http://www.example.org/namespace","prop1") => "424",
-      RubyDav::PropKey.get("DAV:","property1") => "409"}
-    assert_propmultiresponse_object(response,{},propstatushash,0)
+    assert_equal @url_path, response.url
+    statuses = { @url =>
+      { RubyDav::PropKey.get("DAV:","myprop") => "424",
+        RubyDav::PropKey.get("http://www.example.org/namespace","prop1") => "424",
+        RubyDav::PropKey.get("DAV:","property1") => "409"} }
+    assert_propstat_response response, @properties, statuses
   end
   
   def test_proppatch_response_success
@@ -32,9 +34,9 @@ class RubyDavProppatchTest < RubyDavFunctionalTestCase
     pk2 = RubyDav::PropKey.get("DAV:", "property1")
 
     response = get_response_to_mock_proppatch_request("207", body)
-    propertyhash = {pk1 => true, pk2  => true}
-    propstatushash = {pk1 => "200", pk2 => "200"}
-    assert_propmultiresponse_object(response, propertyhash, propstatushash, 0)
+
+    statuses = { @url => {pk1 => "200", pk2 => "200"} }
+    assert_propstat_response response, @properties, statuses
   end
   
   create_proppatch_tests "400","401","403","404","500"

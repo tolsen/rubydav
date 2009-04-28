@@ -20,19 +20,21 @@ class RubyDavCopyTest < RubyDavFunctionalTestCase
     assert_equal @src_path, response.url
     assert response.error?
 
+    # TODO: consolidate this with MultiStatusResponseTest#test_responses
+    # in unit tests
+    
+    prefix = 'http://www.example.org/othercontainer/'
     responses = response.responses
-    assert_equal 4, responses.length
-    
-    assert_equal "http://www.example.org/othercontainer/R2/", responses[0].url
-    assert_instance_of RubyDav::PreconditionFailedError, responses[0]
-    
-    assert_equal "http://www.example.org/othercontainer/R3/", responses[1].url
-    assert_instance_of RubyDav::PreconditionFailedError, responses[1]
-    
-    assert_equal "http://www.example.org/othercontainer/R4/R5/", responses[2].url
-    assert_instance_of RubyDav::ForbiddenError, responses[2]
-    
-    assert_equal response, responses[3]
+    assert_equal 3, responses.length
+
+    %w(R2/ R3/ R4/R5/).each do |suffix|
+      url = prefix + suffix
+      assert_equal url, responses[url].href
+    end
+
+    assert_equal '412', responses[prefix + 'R2/'].status
+    assert_equal '412', responses[prefix + 'R3/'].status
+    assert_equal '403', responses[prefix + 'R4/R5/'].status
   end
   
   create_copy_tests "201","204","400","401","403","409","412","500","507"

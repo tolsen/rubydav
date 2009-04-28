@@ -106,7 +106,7 @@ class WebDavAclCopyMoveTest < Test::Unit::TestCase
   def get_resource_id url, creds={}
     response = @request.propfind(url, 0, :"resource-id", creds)
     assert !response.error?
-    response[:"resource-id"]
+    return response[:"resource-id"]
   end
 
   def test_copy_which_leads_to_dst_resource_id_change_should_fail_if_no_bind_unbind_privs_on_dst_parent

@@ -16,18 +16,24 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
   $:.unshift File.join(File.dirname(__FILE__), '../../better_httpauth/lib')
 
-  require File.dirname(__FILE__) + '/rubydav/response'
-  require File.dirname(__FILE__) + '/rubydav/webdav'
-  require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
+  require File.dirname(__FILE__) + '/rubydav/acl'
   require File.dirname(__FILE__) + '/rubydav/auth'
   require File.dirname(__FILE__) + '/rubydav/auth_world'
+  require File.dirname(__FILE__) + '/rubydav/active_lock'
   require File.dirname(__FILE__) + '/rubydav/connection_pool'
-  require File.dirname(__FILE__) + '/rubydav/http_fixes'
+  require File.dirname(__FILE__) + '/rubydav/current_user_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/file_fixes'
+  require File.dirname(__FILE__) + '/rubydav/http_fixes'
   require File.dirname(__FILE__) + '/rubydav/if_header'
+  require File.dirname(__FILE__) + '/rubydav/lock_discovery'
+  require File.dirname(__FILE__) + '/rubydav/property_result'
+  require File.dirname(__FILE__) + '/rubydav/response'
+  require File.dirname(__FILE__) + '/rubydav/rubydav_xml_builder'
+  require File.dirname(__FILE__) + '/rubydav/supported_lock'
+  require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
+  require File.dirname(__FILE__) + '/rubydav/webdav'
 
-  require 'stringio'
-
+  require 'log4r'
   require 'shared-mime-info'
 
   # == What Is This Library?
@@ -405,57 +411,6 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #   response[:displayname]
   #   response[:Propkey.get('http://example.org/mynamespace', 'tags')]
   #
-  # === Retrieving current user's privileges on a collection and its descendents
-  #
-  #   response = RubyDav.propfind_cups('http://www.example.org/user',
-  #                                    RubyDav::INFINITY,
-  #                                    :username => 'tim', :password => 'swordfish'})
-  #
-  # On success, PropfindCupsResponse with status 207 is returned
-  #
-  # To retrieve the privileges the current user has on /user (:read-acl, :read,
-  # :write):
-  #
-  #   response.privileges
-  #
-  # To access the PropfindCupsResponse for the child:
-  #
-  #   response2 = response.children['index.html']
-  #
-  # To retrieve the privileges the current user has on /user/index.html
-  # (:read-acl, :read, :write):
-  #
-  #   response2.privileges
-  #
-  # === Retrieving access control properties of a collection and its descendents
-  #
-  #   response = RubyDav.propfind_acl('http://www.example.org/user',
-  #                                   RubyDav::INFINITY,
-  #                                   :username => 'tim',
-  #                                   :password => 'swordfish'})
-  #
-  # On success, PropfindAclResponse with status 207 is returned.
-  #
-  # The returns the non-inherited and unprotected aces:
-  #
-  #   response.acl
-  #
-  # The immutable (non-inherited) aces on the collection:
-  #
-  #   response.protected_acl
-  #
-  # the aces inherited from other resources which can be both inherited and
-  # protected:
-  #
-  #   response.inherited_acl
-  #
-  # Access the PropfindAclResponse for the child:
-  #
-  #   response2 = response.children['index.html']
-  #
-  # An Acl is a list of Aces, an Ace defines the privileges a principal has on
-  # the resource.
-  #
   # === Setting access control properties of a collection
   #
   # acl command overwrites the access control list of a resource
@@ -482,12 +437,13 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   # On success, OkResponse with status 200 is returned else appropriate error
   # response
   #
+
   module RubyDav
     # Constant Infinity
     INFINITY = 1.0 / 0.0 unless defined? INFINITY
-    
+
     class Request
-      
+
       # Retrieves the information identified by the Request-URI
       # (only for non-collection resources)
       #
@@ -536,24 +492,24 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :mkcol, url, nil, options
       end
 
-      def mkcol_ext(url, props, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
+#       def mkcol_ext(url, props, options={})
+#         requestbody = String.new
+#         xml ||= RubyDav::XmlBuilder.generate(requestbody)
 
-        xml.D(:mkcol, "xmlns:D" => "DAV:") do
-          xml.D(:set) do
-            xml.D(:prop) do
-              props.each do |propkey, value|
-                propkey =  PropKey.strictly_prop_key(propkey)
-                propkey.printXML xml, value
-              end
-            end
-          end
-        end
+#         xml.D(:mkcol, "xmlns:D" => "DAV:") do
+#           xml.D(:set) do
+#             xml.D(:prop) do
+#               props.each do |propkey, value|
+#                 propkey =  PropKey.strictly_prop_key(propkey)
+#                 propkey.printXML xml, value
+#               end
+#             end
+#           end
+#         end
 
-        bodystream = StringIO.new requestbody
-        request :mkcol_ext, url, bodystream, options
-      end
+#         bodystream = StringIO.new requestbody
+#         request :mkcol_ext, url, bodystream, options
+#       end
 
       # Creates a duplicate of the Source-URI at the Destination-URI.
       # If depth is infinity, copies collection and all its descendents.
@@ -591,14 +547,27 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :move, srcurl, nil, options
       end
 
-      def lock(url, lockinfo, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate requestbody
-        lockinfo.printXML xml
-        bodystream = StringIO.new requestbody
-        options = options.merge( :depth => lockinfo.depth,
-                                 :timeout => lockinfo.timeout )
-        request :lock, url, bodystream, options
+      # options: scope, owner, type, depth, timeout, refresh
+      #
+      # when refreshing, set :refresh to true and set the :if option.
+      # you may ask for a new timeout but you may not change scope,
+      # owner, type, or depth.
+      def lock url, options={}
+        stream = nil
+        unless options[:refresh]
+          scope = options[:scope] || :exclusive
+          type = options[:type] || :write
+
+          stream = RubyDav.build_xml_stream do |xml|
+            xml.lockinfo 'xmlns' => 'DAV:' do
+              xml.locktype { xml.tag! type }
+              xml.lockscope { xml.tag! scope }
+              xml.owner { xml << options[:owner] } if options.include? :owner
+            end
+          end
+        end
+        
+        request :lock, url, stream, options
       end
 
       def unlock(url, lock_token, options={})
@@ -607,35 +576,35 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       end
 
       def bind(url, seg, href, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate requestbody
-        xml.D(:bind, "xmlns:D" => "DAV:") do
-          xml.D(:segment, seg)
-          xml.D(:href, fullurl(href))
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:bind, "xmlns:D" => "DAV:") do
+            xml.D(:segment, seg)
+            xml.D(:href, fullurl(href))
+          end
         end
-        bodystream = StringIO.new requestbody
-        request :bind, url, bodystream, options
+
+        request :bind, url, stream, options
       end
 
       def unbind(coll, seg, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate requestbody
-        xml.D(:unbind, "xmlns:D" => "DAV:") do
-          xml.D(:segment, seg)
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:unbind, "xmlns:D" => "DAV:") do
+            xml.D(:segment, seg)
+          end
         end
-        bodystream = StringIO.new requestbody
-        request :unbind, coll, bodystream, options
+
+        request :unbind, coll, stream, options
       end
 
       def rebind(coll, seg, href, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate requestbody
-        xml.D(:rebind, "xmlns:D" => "DAV:") do
-          xml.D(:segment, seg)
-          xml.D(:href, fullurl(href))
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:rebind, "xmlns:D" => "DAV:") do
+            xml.D(:segment, seg)
+            xml.D(:href, fullurl(href))
+          end
         end
-        bodystream = StringIO.new requestbody
-        request :rebind, coll, bodystream, options
+        
+        request :rebind, coll, stream, options
       end
 
       # Query all the given properties and their values on the Request-URI and its
@@ -644,16 +613,16 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # props is either :allprop, :propname, or a list of propkeys/symbols eg.
       # :displayname, Propkey.get('http://example.org/mynamespace', 'author')
       #
-      # * propfind with :allprop, returns PropMultiResponse with all the
+      # * propfind with :allprop, returns PropstatResponse with all the
       #   properties and their values defined on the Request-URI
-      # * propfind with :propname, returns PropMultiResponse with all the defined
+      # * propfind with :propname, returns PropstatResponse with all the defined
       #   properties on the Request-URI
-      # * propfind with an array returns PropMultiResponse with the request
+      # * propfind with an array returns PropstatResponse with the request
       #   properties and their values for the Request-URI.
       #
       # For the corresponding value of depth all the descendents and their
       # respective properties and values are also reported. The response for the
-      # children of a URI are available by PropMultiResponse.children
+      # children of a URI are available by PropstatResponse.children
       #
       # options hash can be passed as the last element of props.
       def propfind(url, depth=INFINITY, *props)
@@ -683,25 +652,24 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       #   }
       #
       # Returns
-      # * PropMultiResponse with statuses containing
+      # * PropstatResponse with statuses containing
       #   * 200 OK, Note if one command succeeded then all succeed
       #   * Error Codes.
       # * appropriate error response
       def proppatch(url, props, options={})
-        requestbody = String.new
-        xml = RubyDav::XmlBuilder.generate(requestbody)
-        
         setprops = props.reject{|propkey, value| (:remove == value)|| (nil == value) }
         removeprops = props.reject{|propkey, value| :remove != value}
 
-        xml.D(:propertyupdate, "xmlns:D" => "DAV:") do
-          [[:set,setprops], [:remove, removeprops]].each do |(method, updates)|
-            if (updates.size > 0)
-              xml.D(method) do
-                xml.D(:prop) do
-                  updates.each do |propkey, value|
-                    propkey =  PropKey.strictly_prop_key(propkey)
-                    propkey.printXML xml, value
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:propertyupdate, "xmlns:D" => "DAV:") do
+            [[:set,setprops], [:remove, removeprops]].each do |(method, updates)|
+              if (updates.size > 0)
+                xml.D(method) do
+                  xml.D(:prop) do
+                    updates.each do |propkey, value|
+                      propkey =  PropKey.strictly_prop_key(propkey)
+                      propkey.printXML xml, value
+                    end
                   end
                 end
               end
@@ -709,8 +677,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
           end
         end
 
-        bodystream = StringIO.new requestbody
-        request :proppatch, url, bodystream, options
+        request :proppatch, url, stream, options
       end
 
       # Sets the access control entries of the resource.  Overwrites all
@@ -727,39 +694,10 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       def acl(url, acl, options={})
         acl.delete_if{|ace| ace.protected? || ace.kind_of?(InheritedAce)}
         acl.compact! if acl.compacting?
-        requestbody = ""
-        xml ||= RubyDav::XmlBuilder.generate requestbody
-        acl.printXML xml
-        bodystream = StringIO.new requestbody
-        request :acl, url, bodystream, options
+        stream = RubyDav.build_xml_stream { |xml| acl.printXML xml }
+        request :acl, url, stream, options
       end
 
-      # Query all the access-control properties of the Resource-URI and its
-      # descendents.
-      #
-      # Returns
-      # * PropfindAclResponse with all the aces for Request-URI and descendents
-      #   are accessible through children method
-      # * else appropriate error response
-      def propfind_acl(url, depth=INFINITY, options={})
-        options = options.merge :depth => depth
-        bodystream = generate_propfind_bodystream :acl
-        request :propfind_acl, url, bodystream, options
-      end
-
-      # Query all the privileges the current user has on the Request-URI and its
-      # descendents.
-      #
-      # Returns
-      # * PropfindCupsResponse with all the privileges, and descendents are
-      #   accessible through children method
-      # * else appropriate error response
-      def propfind_cups(url, depth=INFINITY, options={})
-        options = options.merge :depth => depth
-        bodystream = generate_propfind_bodystream :"current-user-privilege-set"
-        request :propfind_cups, url, bodystream, options
-      end
-      
       # Start versioning on the given url
       #
       # Returns
@@ -775,15 +713,13 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # * OkResponse on success
       # * else appropriate error response
       def checkout(url, forkok, options={})
-        requestbody = String.new
-        if forkok
-          xml ||= RubyDav::XmlBuilder.generate(requestbody)
+        stream = nil
+        stream = RubyDav.build_xml_stream do |xml|
           xml.D(:checkout, "xmlns:D" => "DAV:") do
             xml.D(:"fork-ok")
           end
-        end
-        bodystream = StringIO.new requestbody
-        request :checkout, url, bodystream, options
+        end if forkok
+        request :checkout, url, stream, options
       end
       
       # Applied to a checked out url to produce a new version whose content and dead properties
@@ -794,9 +730,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # * CreatedResponse on success
       # * else appropriate error response
       def checkin(url, keepcheckedout, forkok, options={})
-        requestbody = String.new
-        if forkok || keepcheckedout
-          xml ||= RubyDav::XmlBuilder.generate(requestbody)
+        stream = nil
+        stream = RubyDav.build_xml_stream do |xml|
           xml.D(:checkin, "xmlns:D" => "DAV:") do
             if forkok
               xml.D(:"fork-ok")
@@ -805,9 +740,9 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
               xml.D(:"keep-checked-out")
             end
           end
-        end
-        bodystream = StringIO.new requestbody
-        request :checkin, url, bodystream, options
+        end if forkok || keepcheckedout
+        
+        request :checkin, url, stream, options
       end
       
       # Applied to a checked out url to cancel any changes made and restore the pre-checked in state
@@ -823,117 +758,109 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         options = {}
         options.merge!(props.pop) if props.last.is_a? Hash
 
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
-        xml.D(:"version-tree", "xmlns:D" => "DAV:") do
-          xml.D(:prop) do
-            props.each do |prop|
-              propkey = PropKey.strictly_prop_key(prop)
-              propkey.printXML(xml)
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:"version-tree", "xmlns:D" => "DAV:") do
+            xml.D(:prop) do
+              props.each do |prop|
+                propkey = PropKey.strictly_prop_key(prop)
+                propkey.printXML(xml)
+              end
             end
           end
         end
 
-        bodystream = StringIO.new(requestbody)
-        request :report_version_tree, url, bodystream, options
+        request :report_version_tree, url, stream, options
       end
 
       def expand_property_report(url, eprops, options={})
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
-        xml.D(:"expand-property", "xmlns:D" => "DAV:") do
-          generate_expand_property_report(xml, eprops)
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:"expand-property", "xmlns:D" => "DAV:") do
+            generate_expand_property_report(xml, eprops)
+          end
         end
-        
-        bodystream = StringIO.new(requestbody)
-        request :report_expand_property, url, bodystream, options
+
+        request :report_expand_property, url, stream, options
       end
 
       def search(url, scope, wherexml, *props)
         options = props.last.is_a?(Hash) ? props.pop.dup : {}
         
-        nresults = options[:limit]
-        orderlist = options[:orderby]
-        offset = options[:offset]
+        nresults, orderlist, offset =
+          options.values_at :limit, :orderby, :offset
 
-        requestbody = String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
-        xml.D(:searchrequest, "xmlns:D" => "DAV:") do
-          xml.D(:basicsearch) do
-            xml.D(:select) do
-              if(:allprop == props[0])
-                xml.D(props[0])
-              else
-                xml.D(:prop) do
-                  props.each do |prop|
-                    propkey = PropKey.strictly_prop_key(prop)
-                    propkey.printXML xml
-                  end
-                end
-              end
-            end
-            xml.D(:from) do
-              scope.each do |href, depth|
-                xml.D(:scope) do
-                  xml.D(:href, href)
-                  xml.D(:depth, depth.to_s)
-                end
-              end
-            end
-            xml.D(:where) { xml << wherexml }
-            if nresults
-              xml.D(:limit) { xml.D(:nresults, nresults.to_s) }
-            end
-            if orderlist
-              xml.D(:orderby) do
-                orderlist.each do |(prop, order)|
-                  xml.D(:order) do 
-                    xml.D(:prop) do 
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:searchrequest, "xmlns:D" => "DAV:") do
+            xml.D(:basicsearch) do
+              xml.D(:select) do
+                if(:allprop == props[0])
+                  xml.D(props[0])
+                else
+                  xml.D(:prop) do
+                    props.each do |prop|
                       propkey = PropKey.strictly_prop_key(prop)
                       propkey.printXML xml
                     end
-                    xml.D(order)
                   end
                 end
               end
-            end
+              xml.D(:from) do
+                scope.each do |href, depth|
+                  xml.D(:scope) do
+                    xml.D(:href, href)
+                    xml.D(:depth, depth.to_s)
+                  end
+                end
+              end
+              xml.D(:where) { xml << wherexml }
+              if nresults
+                xml.D(:limit) { xml.D(:nresults, nresults.to_s) }
+              end
+              if orderlist
+                xml.D(:orderby) do
+                  orderlist.each do |(prop, order)|
+                    xml.D(:order) do 
+                      xml.D(:prop) do 
+                        propkey = PropKey.strictly_prop_key(prop)
+                        propkey.printXML xml
+                      end
+                      xml.D(order)
+                    end
+                  end
+                end
+              end
 
-            if offset
-              xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0") 
+              if offset
+                xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0") 
+              end
             end
           end
         end
-
-        bodystream = StringIO.new requestbody
-        request :search, url, bodystream, options
+        
+        request :search, url, stream, options
       end
 
       def mkredirectref(url, reftarget, options={})
-        requestbody = String.new
-        xml = RubyDav::XmlBuilder.generate(requestbody)
-
-        xml.D(:mkredirectref, "xmlns:D" => "DAV:") do
-          xml.D(:reftarget) do
-            xml.D(:href, reftarget)
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:mkredirectref, "xmlns:D" => "DAV:") do
+            xml.D(:reftarget) do
+              xml.D(:href, reftarget)
+            end
+            xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
           end
-          xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
         end
 
-        bodystream = StringIO.new(requestbody)
-        request :mkredirectref, url, bodystream, options
+        request :mkredirectref, url, stream, options
       end
 
       def updateredirectref(url, options={})
-        requestbody = String.new
-        xml = RubyDav::XmlBuilder.generate(requestbody)
-
-        xml.D(:updateredirectref, "xmlns:D" => "DAV:") do
-          xml.D(:reftarget) { xml.D(:href, options[:reftarget]) } if options[:reftarget]
-          xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
+        stream = RubyDav.build_xml_stream do |xml|
+          xml.D(:updateredirectref, "xmlns:D" => "DAV:") do
+            xml.D(:reftarget) { xml.D(:href, options[:reftarget]) } if options[:reftarget]
+            xml.D(:"redirect-lifetime") { xml.D(options[:lifetime]) } if options[:lifetime]
+          end
         end
-
-        bodystream = StringIO.new(requestbody)
-        request :updateredirectref, url, bodystream, options
+        
+        request :updateredirectref, url, stream, options
       end
 
       def self.clone_class_from_instance_methods *method_syms
@@ -1040,6 +967,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request.add_field('Authorization', auth.authorization(request.method, requesturl)) unless auth.nil?
 
         http_response = @connection_pool.request(uri, request)
+
+        @logger.debug { http_response.body }
         ResponseFactory.get(uri.path, http_response.code, http_response.to_hash,
                             http_response.body, httpmethod)
       end
@@ -1155,29 +1084,27 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
           request.add_field req_key, req_value
         end
       end
+
+      def generate_props_xml xml, props
+        props.each { |p| PropKey.strictly_prop_key(p).printXML(xml) }
+      end
       
-      def generate_propfind_bodystream(*props)
-        requestbody= String.new
-        xml ||= RubyDav::XmlBuilder.generate(requestbody)
-        xml.D(:propfind, "xmlns:D" => "DAV:") do
-          if (props[0] == :allprop) || (props[0] == :propname)
-            xml.D(props[0])
-          else
-            xml.D(:prop) do
-              case props.first
-              when :acl, :"current-user-privilege-set" then
-                xml.D(props[0])
-              else
-                #output prop xml
-                props.each do |prop|
-                  propkey = PropKey.strictly_prop_key(prop)
-                  propkey.printXML(xml)
-                end
-              end
+      def generate_propfind_bodystream *props
+        return RubyDav.build_xml_stream do |xml|
+          xml.D(:propfind, "xmlns:D" => "DAV:") do
+            if props.include? :propname
+              xml.D :propname
+            elsif props.include? :allprop
+              xml.D :allprop
+              remaining_props = props.reject { |p| p == :allprop }
+              xml.D(:include) do
+                generate_props_xml xml, remaining_props
+              end unless remaining_props.empty?
+            else
+              xml.D(:prop) { generate_props_xml xml, props }
             end
           end
         end
-        StringIO.new(requestbody)
       end
 
       def generate_expand_property_report(xml, eprophash)
@@ -1207,10 +1134,14 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # :password
       
       def initialize options = {}
-        options[:base_url] ||= ""
+        options = { :base_url => '', :log_level => 'INFO' }.merge options
         @global_opts = options
         @auth_world = AuthWorld.new
         @connection_pool = ConnectionPool.new
+
+        @logger = Log4r::Logger.new "RubyDav Request #{object_id}"
+        @logger.outputters = Log4r::Outputter.stdout
+        @logger.level = Log4r.const_get options[:log_level].upcase
       end
 
       def fullurl url
