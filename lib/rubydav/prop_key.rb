@@ -31,9 +31,10 @@ module RubyDav
       "{#{ns}}#{name}"
     end
     
-    # returns PropKey given PropKey or Symbol
+    # returns PropKey given PropKey or Symbol or String
     def self.strictly_prop_key propkey_or_symbol
-      return propkey_or_symbol unless propkey_or_symbol.is_a?(Symbol)
+      return propkey_or_symbol unless
+        propkey_or_symbol.is_a?(Symbol) || propkey_or_symbol.is_a?(String)
       return @@registeredkeys[propkey_or_symbol] if
         @@registeredkeys.include? propkey_or_symbol
       return self.get("DAV:", propkey_or_symbol)
