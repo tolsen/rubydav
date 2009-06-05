@@ -1073,7 +1073,17 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
             auth && auth.stale?
         end
         
-        return response3 || response2 || response1
+        response = response3 || response2 || response1
+
+        if response.status == '503' and options[:retry_on503] and response.headers['retry-after']
+          @retry_num ||= 1
+          if @retry_num < options[:retry_on503]
+            sleep(response.headers['retry-after'].to_s.to_i/100)
+            @retry_num += 1
+            response = request(httpmethod, url, stream, options)
+          end
+        end
+        response
       end
 
       def add_request_header request, options, key, &block
