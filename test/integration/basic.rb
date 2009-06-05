@@ -448,70 +448,86 @@ class WebDavBasicTest < Test::Unit::TestCase
     delete_file 'test~'
   end
 
-  def test_pipelined_put_requests
-    RubyDav::Request.module_eval do
-      alias_method :request_orig, :request
-      def request *args
-        num_503_retries = 5
-        response = request_orig *args
+  def each_req_in_diff_thread enum, creds = {:base_url => @host, :retry_on503 => 5}, &block
+    enum.map do |i|
+      request = RubyDav::Request.new @creds.merge(creds)
+      Thread.new request, *i, &block
+    end.each { |thr| thr.join }
+  end
 
-        while response.status == '503' and response.headers['retry-after'] and num_503_retries
-          num_503_retries -= 1
-          sleep(response.headers['retry-after'].to_s.to_i/100)
-          response = request_orig *args
-        end 
-        response
-      end
-    end
+  def test_parallel_put_requests
 
     files = {}
+
     20.times do |i|
       filename = i.to_s
       files[filename] = "Contents of file '#{filename}'"
     end
 
-    files.instance_variable_set :@req_creds, @creds.merge(:base_url => @host)
-    def files.each_request_in_diff_thread &block
-      self.map do |file|
-        request = RubyDav::Request.new @req_creds
-        Thread.new request, *file, &block
-      end.each {|thr| thr.join }
-    end
-
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.delete filename
       assert ['204','404'].include?(response.status), "Deleting file #{filename}"
     end
 
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.put filename, StringIO.new(filebody)
       assert_equal '201', response.status, "Put new file #{filename}"
     end
-
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.get filename
       assert_equal '200', response.status, "Get on file #{filename}"
       assert_equal filebody, response.body, "File body of #{filename}"
     end
 
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.put filename, StringIO.new(filebody)
       assert_equal '204', response.status, "Overwriting file #{filename}"
     end
 
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.get filename
       assert_equal '200', response.status, "Get on file #{filename}"
       assert_equal filebody, response.body, "File body of #{filename}"
     end
 
-    files.each_request_in_diff_thread do |request, filename, filebody|
+    each_req_in_diff_thread files do |request, filename, filebody|
       response = request.delete filename
       assert_equal '204', response.status, "Deleting file #{filename}"
     end
 
-    RubyDav::Request.module_eval do
-      alias_method :request, :request_orig
-    end
   end
+
+  def test_parallel_deletes_on_deep_collections
+    folders = []
+
+    20.times { |i| folders[i] = i.to_s }
+
+    each_req_in_diff_thread folders do |request, foldername|
+      response = request.delete foldername
+      assert ['204','404'].include?(response.status), "Deleting folder #{foldername}"
+    end
+
+    each_req_in_diff_thread folders do |request, foldername|
+      response = request.mkcol foldername
+      assert_equal '201', response.status, "Creating folder #{foldername}"
+    end
+
+    each_req_in_diff_thread folders do |request, foldername|
+      response = request.mkcol foldername + '/subcol'
+      assert_equal '201', response.status, "Creating folder #{foldername}/subcol"
+    end
+
+    each_req_in_diff_thread folders do |request, foldername|
+      response = request.put foldername + '/file', StringIO.new("#{foldername}/subcol/file")
+      assert_equal '201', response.status, "Creating file #{foldername}/subcol/file"
+    end
+
+    each_req_in_diff_thread folders do |request, foldername|
+      response = request.delete foldername
+      assert_equal '204', response.status, "Deleting folder #{foldername}"
+    end
+
+  end
+  
 end
