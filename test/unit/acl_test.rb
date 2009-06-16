@@ -248,6 +248,12 @@ EOS
     assert ace.protected?
   end
 
+  def test_hash
+    # cannot test that hash values are different as there may be a collision
+    ace2 = create_ace :grant, :all, true, "write", "read"
+    assert_equal @ace.hash, ace2.hash
+  end
+
   def test_parse_principal_element__all
     principal_str = "<principal xmlns='DAV:'><all/></principal>"
     principal_elem = REXML::Document.new(principal_str).root
@@ -532,6 +538,16 @@ EOS
                    RubyDav::Ace.new(:grant, :all, false,
                                     RubyDav::PropKey.get('DAV:', 'read'))]
     assert_equal expected_acl, acl
+  end
+
+  def test_hash
+    acl2 = RubyDav::Acl.new
+    ace2 = RubyDav::Ace.new :grant, :all, true, "read-acl"
+    iace2 = RubyDav::InheritedAce.new "http://www.example.org", :grant, :all, true, "read-acl"
+    acl3 = RubyDav::Acl[ace2, iace2]
+
+    assert_equal @acl.hash, acl2.hash
+    assert_equal @acl2.hash, acl3.hash
   end
   
   def test_unshift_with_compacting_true

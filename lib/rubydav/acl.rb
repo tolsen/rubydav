@@ -48,7 +48,12 @@ module RubyDav
         (@isprotected == other.protected?) &&
         (@privileges == other.privileges)
     end
-    alias eql? == 
+    alias eql? ==
+
+    def hash
+      return ("#{self.class.hash}/#{@action.hash}/#{@principal.hash}" +
+              "/#{@isprotected.hash}/#{@privileges.hash}").hash
+    end
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
