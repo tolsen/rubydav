@@ -16,6 +16,8 @@ class PropertyResultTestCase < RubyDavUnitTestCase
 
     @error_result = RubyDav::PropertyResult.new @displayname_pk, '404', nil, :error
 
+    @result208 =
+      RubyDav::PropertyResult.new @displayname_pk, '208', @displayname_element
 
     @test_pk = RubyDav::PropKey.get 'DAV:', 'test'
     RubyDav::PropertyResult.define_class_reader :test_reader, TestClass, 'test'
@@ -78,6 +80,7 @@ class PropertyResultTestCase < RubyDavUnitTestCase
   def test_success
     assert @result.success?
     assert !@error_result.success?
+    assert @result208.success?
   end
 
   def test_value 

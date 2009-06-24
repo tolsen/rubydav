@@ -29,7 +29,7 @@ module RubyDav
     end
 
     def success?
-      status == '200'
+      (status.to_i / 100) == 2
     end
 
     def value
