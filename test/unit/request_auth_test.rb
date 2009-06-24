@@ -19,7 +19,6 @@ class RequestAuthTest < RubyDavUnitTestCase
 
     @unauth_request_count = 0
     @auth_request_count = 0
-
   end
 
   def test_basic_auth
@@ -146,6 +145,57 @@ class RequestAuthTest < RubyDavUnitTestCase
     assert_receives_401_and_then_200 'tim', 'swordfish', request
   end
 
+  def test_merge_request_options__conflict_only_in_request_call
+    request = RubyDav::Request.new
+    assert_raises RuntimeError do
+      request.send(:merge_request_options,
+                   :digest_a1 => :foo, :password => :bar)
+    end
+  end
+
+  def test_merge_request_options__conflict_only_in_request_object
+    request = RubyDav::Request.new :digest_a1 => :foo, :password => :bar
+    assert_raises(RuntimeError) { request.send :merge_request_options, {} }
+  end
+
+  def test_merge_request_options__digest_a1_wins_conflict
+    request = RubyDav::Request.new :password => :foo
+    result = request.send :merge_request_options, :digest_a1 => :bar
+    assert_equal :bar, result[:digest_a1]
+    assert !result.include?(:password)
+  end
+
+  def test_merge_request_options__no_conflict_1
+    request = RubyDav::Request.new
+    result = request.send :merge_request_options, :digest_a1 => :foo
+    assert_equal :foo, result[:digest_a1]
+  end
+
+  def test_merge_request_options__no_conflict_2
+    request = RubyDav::Request.new
+    result = request.send :merge_request_options, :password => :foo
+    assert_equal :foo, result[:password]
+  end
+
+  def test_merge_request_options__no_conflict_3
+    request = RubyDav::Request.new :digest_a1 => :foo
+    result = request.send :merge_request_options, {}
+    assert_equal :foo, result[:digest_a1]
+  end
+
+  def test_merge_request_options__no_conflict_4
+    request = RubyDav::Request.new :password => :foo
+    result = request.send :merge_request_options, {}
+    assert_equal :foo, result[:password]
+  end
+
+  def test_merge_request_options__password_wins_conflict
+    request = RubyDav::Request.new :digest_a1 => :foo
+    result = request.send :merge_request_options, :password => :bar
+    assert_equal :bar, result[:password]
+    assert !result.include?(:digest_a1)
+  end
+
   def test_request_rooturl
     valid_get = on do |req|
       req.is_a?(Net::HTTP::Get) &&
@@ -178,7 +228,7 @@ class RequestAuthTest < RubyDavUnitTestCase
 
     flexmock(Net::HTTP).new_instances do |http|
       add_unauth_expectation http
-      add_auth_expectation_returning_401(http, valid_digest_get, 'tim', 'swordfish',
+      add_auth_expectation_returning_401(http, valid_digest_get,
                                          @body, :default, true)
       add_auth_expectation http, valid_digest_get
       http.should_receive(:request).zero_or_more_times.ordered.and_return { flunk "too many requests made!" }
@@ -301,8 +351,7 @@ class RequestAuthTest < RubyDavUnitTestCase
     end
   end
 
-  def add_auth_expectation_returning_401(http, valid_get, username = 'tim',
-                                         password = 'swordfish', body = @body,
+  def add_auth_expectation_returning_401(http, valid_get, body = @body,
                                          nonce_key = :default, stale = false)
     http.should_receive(:request).once.ordered.with(valid_get).and_return do |req|
       @auth_request_count += 1
