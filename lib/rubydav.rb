@@ -903,7 +903,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       
       ############################################################
 
-
+      def base_url() @global_opts[:base_url]; end
+      
       # tries at most one request which may return a 401
       def try_request httpmethod, uri, stream, auth, options
         requesturl = uri.path
