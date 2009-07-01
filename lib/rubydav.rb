@@ -955,6 +955,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
         add_request_header(request, options, :accept_encoding)
 
+        add_request_header(request, options, :x_requested_with)
+
         unless stream.nil?
           add_request_header request, options, :content_type
           request.add_field('Expect', '100-continue')
