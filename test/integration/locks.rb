@@ -826,8 +826,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal 1, locks.size
     lock2 = locks[lock1.token]
 
-    # CURRENTLY FAILING
-    #assert_in_delta 10000, lock2.timeout, 50
+    assert_in_delta 10000, lock2.timeout, 50
 
     unlock 'file', lock1.token
   ensure
