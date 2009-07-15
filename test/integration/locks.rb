@@ -825,8 +825,16 @@ class WebDavLocksTest < Test::Unit::TestCase
     locks = response.lock_discovery.locks
     assert_equal 1, locks.size
     lock2 = locks[lock1.token]
-
     assert_in_delta 10000, lock2.timeout, 50
+
+    # check that propfind shows the lock is refreshed
+    response = @request.propfind 'file', 0, :lockdiscovery
+    assert_equal '207', response.status
+    assert_equal '200', response[:lockdiscovery].status
+    locks = response[:lockdiscovery].lock_discovery.locks
+    assert_equal 1, locks.size
+    lock3 = locks[lock1.token]
+    assert_in_delta 10000, lock3.timeout, 100
 
     unlock 'file', lock1.token
   ensure
