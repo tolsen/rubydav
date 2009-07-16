@@ -179,7 +179,7 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     # test user doesn't have any permissions. grant him a reversed acl and retry
-    modify_acl 'file' do |acl|
+    modify_acl 'file', :if => lock.token do |acl|
       # Note: Specific to limestone
       # Assuming a newly created resource has only protected/inherited aces.
       assert acl.empty?
@@ -191,7 +191,7 @@ class WebDavAclTest < Test::Unit::TestCase
     assert_equal '403', response.status
     
     # correct the acl order and retry
-    modify_acl 'file' do |acl|
+    modify_acl 'file', :if => lock.token do |acl|
       acl.reverse!
     end
 
@@ -635,12 +635,12 @@ class WebDavAclTest < Test::Unit::TestCase
 
   # helpers
 
-  def modify_acl resource, &block
-    response = @request.propfind resource, 0, :acl
+  def modify_acl resource, creds={}, &block
+    response = @request.propfind resource, 0, :acl, creds
     assert !response.error?
     acl = response[:acl].acl.modifiable
     yield acl
-    response = @request.acl(resource, acl)
+    response = @request.acl(resource, acl, creds)
     assert_equal '200', response.status
   end
 

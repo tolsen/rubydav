@@ -82,7 +82,7 @@ class WebDavAclLocksTest < Test::Unit::TestCase
 
     # grant all on lockfile to test
     ace = RubyDav::Ace.new(:grant, test_principal_uri, false, :all)
-    add_ace_and_set_acl lockfile, ace
+    add_ace_and_set_acl lockfile, ace, :if => lock.token
 
     ifhdr = { lockfile => lock.token }
 
@@ -143,7 +143,7 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     grant_unlock = RubyDav::Ace.new :grant, test_principal_uri, false, :unlock
-    add_ace_and_set_acl 'file', grant_unlock
+    add_ace_and_set_acl 'file', grant_unlock, :if => lock.token
 
     # should still not be able to write even if you have DAV:unlock
     response = @request.put('file', StringIO.new('string5'),
@@ -158,21 +158,28 @@ class WebDavAclLocksTest < Test::Unit::TestCase
   end
   
   # limestone specific.  assumes some lack of default acls
-  def failing_test_lock_acl
+  def test_lock_acl
     new_file 'file'
     lock = lock 'file'
     
     acl = get_acl 'file'
-    ace = RubyDav::Ace.new :grant, test_principal_uri, false, :'read-acl'
+    ace = RubyDav::Ace.new :grant, test_principal_uri, false, :read
     acl.unshift ace
 
     response = @request.acl 'file', acl
     assert_equal '423', response.status
 
     response = @request.propfind 'file', 0, :acl, testcreds
+    assert_equal '403', response.status
+
+    response = @request.acl 'file', acl, :if => lock.token
+    assert_equal '200', response.status
+
+    response = @request.propfind 'file', 0, :acl, testcreds
     assert_equal '207', response.status
     assert_equal '403', response[:acl].status
 
+    acl.unshift RubyDav::Ace.new(:grant, test_principal_uri, false, :'read-acl')
     response = @request.acl 'file', acl, :if => lock.token
     assert_equal '200', response.status
 
@@ -180,12 +187,12 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_equal '200', response[:acl].status
 
-    response = @request.unlock 'file'
+    response = @request.unlock 'file', lock.token
     assert_equal '204', response.status
 
     delete_file 'file'
   end
-   
+
   def failing_test_locking_privilege
     new_file 'lockfile'
 
