@@ -108,7 +108,7 @@ EOS
     assert_equal @locktoken, response.lock_token
     assert_equal [@locktoken], response.lock_discovery.locks.keys
     
-    assert_equal 'www.example.org', response.active_lock.root
+    assert_equal 'http://example.com/workspace/webdav/proposal.doc', response.active_lock.root
   end
 
   def test_create__without_lock_token_header

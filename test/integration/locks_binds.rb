@@ -567,4 +567,32 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     cleanup_test_scenario_1
   end
+
+  def test_lockroot_on_other_bind_to_locked_resource
+    new_coll 'testcol'
+
+    new_coll 'testcol/lockrootcol'
+    lock = lock 'testcol/lockrootcol'
+
+    response = @request.bind 'testcol', 'secondbind', 'testcol/lockrootcol'
+    assert_equal '201', response.status
+
+    response = @request.bind 'testcol', 'thirdbind', 'testcol/lockrootcol'
+    assert_equal '201', response.status
+
+    response = @request.propfind 'testcol/secondbind', 0, :lockdiscovery
+    assert_equal '207', response.status
+    assert_equal '200', response[:lockdiscovery].status
+    assert_equal "#{@uri.path}testcol/lockrootcol", response[:lockdiscovery].lockdiscovery.locks.values[0].root
+
+    response = @request.delete 'testcol/thirdbind'
+    assert_equal '204', response.status
+    
+    response = @request.delete 'testcol/lockrootcol'
+    assert_equal '423', response.status
+
+    response = @request.delete 'testcol', :if => { 'testcol/secondbind' => lock.token }
+    assert_equal '204', response.status
+  end
+
 end

@@ -189,8 +189,6 @@ module RubyDav
         lock_discovery = parse_body(body)
 
         response = new url, status, headers, body, lock_discovery
-        active_lock = response.active_lock
-        active_lock.root = url unless active_lock.nil?
         return response
       end
 

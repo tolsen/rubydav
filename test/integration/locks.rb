@@ -275,6 +275,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_equal '200', response[:lockdiscovery].status
     assert_equal [lock], response[:lockdiscovery].lockdiscovery.locks.values
+    assert_equal "#{@uri.path}col", response[:lockdiscovery].lockdiscovery.locks.values[0].root
 
     response = @request.put 'col/file', StringIO.new('string5')
     assert_equal '423', response.status
@@ -837,6 +838,20 @@ class WebDavLocksTest < Test::Unit::TestCase
     unlock 'file', lock1.token
   ensure
     teardown_file
+  end
+
+  def test_lockroot_in_lock_refresh_response
+    new_coll 'col'
+    new_file 'col/file'
+
+    lock = lock 'col', :depth => RubyDav::INFINITY
+
+    response = @request.lock('col/file', :refresh => true, :if => lock.token, :timeout => 10000)
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_equal "#{@uri.path}col", response.lock_discovery.locks.values[0].root
+
+    unlock 'col', lock.token
+    delete_coll 'col'
   end
 
   # limestone specific
