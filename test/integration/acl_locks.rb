@@ -193,7 +193,7 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     delete_file 'file'
   end
 
-  def failing_test_locking_privilege
+  def test_locking_privilege
     new_file 'lockfile'
 
     response = @request.lock 'lockfile', testcreds
@@ -204,6 +204,9 @@ class WebDavAclLocksTest < Test::Unit::TestCase
     
     response = @request.lock 'lockfile', testcreds
     assert_equal '200', response.status
+    lock = response.active_lock
+
+    response = @request.unlock 'lockfile', lock.token
   ensure
     delete_file 'lockfile'
   end
