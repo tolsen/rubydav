@@ -224,8 +224,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
 
     # creating a new file and deleting it should require the locktoken
-    # CURRENTLY FAILING
-#    assert_put_and_delete_requires_token 'col/file2', lock.token
+    assert_put_and_delete_requires_token 'col/file2', 'col' => lock.token
 
     unlock 'col', lock.token
   ensure
@@ -283,8 +282,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put 'col/file', StringIO.new('string5'), :if => lock.token
     assert_equal '204', response.status
 
-    # CURRENTLY FAILING
-#    assert_put_and_delete_requires_token 'col/file2', lock.token
+    assert_put_and_delete_requires_token 'col/file2', 'col' => lock.token
 
     unlock 'col', lock.token
     assert_empty_lockdiscovery 'col/file'
