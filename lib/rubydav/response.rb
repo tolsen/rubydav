@@ -542,6 +542,7 @@ module RubyDav
       ['413', nil] => RequestEntityTooLargeError,
       ['414', nil] => RequestUriTooLargeError,
       ['415', nil] => UnsupportedMediaTypeError,
+      ['422', nil] => ErrorResponse,
       ['423', nil] => LockedError,
       ['424', :mkcol_ext] => MkcolResponse,
       ['424', nil] => ErrorResponse,
