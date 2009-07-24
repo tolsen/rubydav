@@ -764,7 +764,7 @@ class WebDavAclTest < Test::Unit::TestCase
 
     # assert that the protected aces come first
     response[:acl].acl.inject true do |prev_protected, ace|
-      assert (prev_protected or !ace.protected?), "protected ace appeared after unprotected ace"
+      assert((prev_protected || !ace.protected?), "protected ace appeared after unprotected ace")
       ace.protected?
     end
 
