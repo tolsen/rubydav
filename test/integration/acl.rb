@@ -514,6 +514,28 @@ class WebDavAclTest < Test::Unit::TestCase
     delete_coll testcol
   end
 
+  def test_cups_on_resource_w_conflicting_inherited_aces
+    cups = :"current-user-privilege-set"
+    new_coll 'col'
+
+    ace = RubyDav::Ace.new :grant, test_principal_uri, false, :all
+    add_ace_and_set_acl 'col', ace
+
+    new_coll 'col/subcol'
+    ace = RubyDav::Ace.new :deny, test_principal_uri, false, :write
+    add_ace_and_set_acl 'col/subcol', ace
+
+    new_file 'col/subcol/file'
+
+    response = @request.propfind 'col/subcol/file', 0, cups, testcreds
+    assert_equal '207', response.status
+    assert_equal '200', response[cups].status
+    privileges = response[cups].cups.privileges
+    assert privileges.include?(@privs[:read])
+    assert privileges.include?(@privs[:"read-cups"])
+    assert !privileges.include?(@privs[:write])
+  end
+
   def test_acl_principal_all
     testfile = 'testfile'
     new_file testfile
@@ -716,4 +738,42 @@ class WebDavAclTest < Test::Unit::TestCase
 
     delete_file 'file'
   end
+
+  def test_protected_inherited_aces_override_non_protected_non_inherited_aces
+    # assumes existence on every resource of protected ace granting DAV:all to DAV:owner
+    cups = :"current-user-privilege-set"
+
+    new_coll 'col'
+
+    # grant bind on collection to test user
+    ace = RubyDav::Ace.new(:grant, test_principal_uri, false, :bind)
+    add_ace_and_set_acl 'col', ace
+
+    # create a child collection as test
+    new_coll 'col/testcol', testcreds
+
+    # on this child collection, have test user deny all to the user
+    ace = RubyDav::Ace.new(:deny, get_principal_uri(@username, baseuri), false, :all)
+    add_ace_and_set_acl 'col/testcol', ace, testcreds
+
+    # check that user can still access testcol even though the test user tried to deny privileges to him
+    response = @request.propfind 'col/testcol', 0, :acl, cups
+    assert_equal '207', response.status
+    assert_equal '200', response[:acl].status
+    assert_equal '200', response[cups].status
+
+    # assert that the protected aces come first
+    response[:acl].acl.inject true do |prev_protected, ace|
+      assert((prev_protected || !ace.protected?), "protected ace appeared after unprotected ace")
+      ace.protected?
+    end
+
+    # assert that cups has all privs for the user
+    assert response[cups].cups.privileges.include?(@privs[:all])
+
+    new_file 'col/testcol/file'
+  ensure
+    delete_coll 'col'
+  end
+
 end
