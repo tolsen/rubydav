@@ -103,7 +103,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
   end
 
-  def failing_test_lock_bad_request
+  def test_lock_bad_request
     setup_file
 
     response = @request.lock 'file', :type => :read
@@ -114,9 +114,6 @@ class WebDavLocksTest < Test::Unit::TestCase
 
     # expects 400 instead of 422 because depth is a header
     response = @request.lock 'file', :depth => 1
-    assert_equal '400', response.status
-
-    response = @request.lock 'file', :timeout => 'BadTimeout'
     assert_equal '400', response.status
   ensure
     teardown_file
@@ -224,8 +221,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '204', response.status
 
     # creating a new file and deleting it should require the locktoken
-    # CURRENTLY FAILING
-#    assert_put_and_delete_requires_token 'col/file2', lock.token
+    assert_put_and_delete_requires_token 'col/file2', 'col' => lock.token
 
     unlock 'col', lock.token
   ensure
@@ -276,6 +272,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_equal '200', response[:lockdiscovery].status
     assert_equal [lock], response[:lockdiscovery].lockdiscovery.locks.values
+    assert_equal "#{@uri.path}col", response[:lockdiscovery].lockdiscovery.locks.values[0].root
 
     response = @request.put 'col/file', StringIO.new('string5')
     assert_equal '423', response.status
@@ -283,8 +280,7 @@ class WebDavLocksTest < Test::Unit::TestCase
     response = @request.put 'col/file', StringIO.new('string5'), :if => lock.token
     assert_equal '204', response.status
 
-    # CURRENTLY FAILING
-#    assert_put_and_delete_requires_token 'col/file2', lock.token
+    assert_put_and_delete_requires_token 'col/file2', 'col' => lock.token
 
     unlock 'col', lock.token
     assert_empty_lockdiscovery 'col/file'
@@ -825,13 +821,34 @@ class WebDavLocksTest < Test::Unit::TestCase
     locks = response.lock_discovery.locks
     assert_equal 1, locks.size
     lock2 = locks[lock1.token]
+    assert_in_delta 10000, lock2.timeout, 50
 
-    # CURRENTLY FAILING
-    #assert_in_delta 10000, lock2.timeout, 50
+    # check that propfind shows the lock is refreshed
+    response = @request.propfind 'file', 0, :lockdiscovery
+    assert_equal '207', response.status
+    assert_equal '200', response[:lockdiscovery].status
+    locks = response[:lockdiscovery].lock_discovery.locks
+    assert_equal 1, locks.size
+    lock3 = locks[lock1.token]
+    assert_in_delta 10000, lock3.timeout, 100
 
     unlock 'file', lock1.token
   ensure
     teardown_file
+  end
+
+  def test_lockroot_in_lock_refresh_response
+    new_coll 'col'
+    new_file 'col/file'
+
+    lock = lock 'col', :depth => RubyDav::INFINITY
+
+    response = @request.lock('col/file', :refresh => true, :if => lock.token, :timeout => 10000)
+    assert_equal 1, response.lock_discovery.locks.size
+    assert_equal "#{@uri.path}col", response.lock_discovery.locks.values[0].root
+
+    unlock 'col', lock.token
+    delete_coll 'col'
   end
 
   # limestone specific
