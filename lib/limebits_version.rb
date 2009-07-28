@@ -7,7 +7,7 @@ module LimebitsVersion
 
         git_branch_string =
           execute('set -o pipefail; git branch --no-color | grep \\* | cut -d" " -f2')[0].strip
-        git_commit_string = execute('git log -n1 --format=%H')[0].strip
+        git_commit_string = execute('git log -n1 --pretty=format:%H')[0].strip
 
         git_tag_string = nil
         for tag in execute("git for-each-ref --format='%(*objectname)" +
