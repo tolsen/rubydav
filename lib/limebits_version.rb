@@ -18,15 +18,15 @@ module LimebitsVersion
           end
         end
 
-        git_status_string = execute("git status", [0, 1])[0]
-        git_status_a_exit_code = execute('git status -a > /dev/null', [0, 1])[1]
+        git_status_string = execute("make status")[0]
+        git_status_a_exit_code = execute('make fail-if-not-pristine >& /dev/null', [0, 2])[1]
 
         next {
           'tag'         => git_tag_string,
           'branch'      => git_branch_string,
           'commit'      => git_commit_string,
           'status'      => git_status_string,
-          'pristine'    => (git_status_a_exit_code == 1),
+          'pristine'    => (git_status_a_exit_code == 0),
         }
       end
     end
