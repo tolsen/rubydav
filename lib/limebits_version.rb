@@ -19,7 +19,6 @@ module LimebitsVersion
 
         git_status_string = `git status`
         git_status_a_exit_code = system 'git status -a > /dev/null'
-        datetime_string = Time.new.inspect
 
         return {
           'tag'         => git_tag_string,
@@ -27,7 +26,6 @@ module LimebitsVersion
           'commit'      => git_commit_string,
           'status'      => git_status_string,
           'pristine'    => (not git_status_a_exit_code),
-          'deployed_at' => datetime_string
         }
       end
     end
