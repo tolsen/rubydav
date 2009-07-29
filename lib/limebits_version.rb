@@ -18,14 +18,15 @@ module LimebitsVersion
           end
         end
 
-        git_status_string = execute("make status")[0]
-        pristine = execute('make fail-if-not-pristine >& /dev/null', [0, 2])[1] == 0
+        pristine =
+          execute("(git submodule foreach 'git status -a; test $? -ne 0'" +
+                  " && (git status -a; test $? -ne 0)) >& /dev/null",
+                  [0, 1])[1] == 0
 
         next {
           'tag'         => git_tag_string,
           'branch'      => git_branch_string,
           'commit'      => git_commit_string,
-          'status'      => git_status_string,
           'pristine'    => pristine,
         }
       end
