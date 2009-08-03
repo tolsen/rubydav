@@ -11,9 +11,10 @@ module LimebitsVersion
 
         git_tag_string = nil
         for tag in execute("git for-each-ref --format='%(*objectname)" +
-                           " %(refname:short)' --sort=-taggerdate refs/tags")[0]
+                           " %(refname)' --sort=-taggerdate refs/tags")[0]
           if tag.include? git_commit_string
             git_tag_string = tag.split(' ', 2).last.strip
+            git_tag_string.sub!('refs/tags/', '') 
             break
           end
         end
