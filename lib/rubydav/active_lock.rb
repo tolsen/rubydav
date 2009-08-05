@@ -2,8 +2,7 @@ module RubyDav
 
   class ActiveLock
 
-    attr_reader :scope, :type, :depth, :owner, :timeout, :token
-    attr_accessor :root
+    attr_reader :scope, :type, :depth, :owner, :timeout, :token, :root
 
     # does not check that root is equal
     def eql? other

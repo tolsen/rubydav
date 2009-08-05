@@ -189,8 +189,6 @@ module RubyDav
         lock_discovery = parse_body(body)
 
         response = new url, status, headers, body, lock_discovery
-        active_lock = response.active_lock
-        active_lock.root = url unless active_lock.nil?
         return response
       end
 
@@ -544,6 +542,7 @@ module RubyDav
       ['413', nil] => RequestEntityTooLargeError,
       ['414', nil] => RequestUriTooLargeError,
       ['415', nil] => UnsupportedMediaTypeError,
+      ['422', nil] => ErrorResponse,
       ['423', nil] => LockedError,
       ['424', :mkcol_ext] => MkcolResponse,
       ['424', nil] => ErrorResponse,
