@@ -32,4 +32,12 @@ class WebDavLimeBitsTagsTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_equal '200', response[tagp_key].status
   end
+
+  def test_tag_owner
+    new_coll '/tags/tag_owner'
+
+    response = @request.propfind('/tags/tag_owner', 0, :owner)
+    assert_equal '207', response.status
+    assert_match /\/users\/limestone/, response[:owner].value
+  end
 end
