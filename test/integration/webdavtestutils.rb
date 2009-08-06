@@ -65,8 +65,10 @@ module WebDavTestUtils
   
   # required to convert relative paths into absolute URIs
   def baseuri
-    hosturi = URI.parse(@host)
-    hosturi.scheme + "://" + hosturi.host + ":" + hosturi.port.to_s
+    scheme, userinfo, host, port = URI.split(@host)
+    uri = "#{scheme}://#{host}"
+    uri += ":#{port}" unless port.nil?
+    return uri
   end
 
   def assert_content_equals(expcontent, file, creds={})
