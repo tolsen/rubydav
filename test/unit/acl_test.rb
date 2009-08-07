@@ -453,6 +453,15 @@ EOS
     assert_equal @ace, @acl2[0]
     assert_equal @iace, @acl2[1]
   end
+
+  def test_clone
+    acl3 = @acl2.clone
+    @acl2.push @ace
+    assert_equal 3, @acl2.size
+    
+    # check that pushing onto @acl2 didn't inadvertently push onto acl3
+    assert_equal 2, acl3.size
+  end
   
   def test_create
     assert_instance_of RubyDav::Acl, @acl
