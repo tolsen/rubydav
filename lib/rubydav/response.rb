@@ -2,7 +2,6 @@ require File.dirname(__FILE__) + '/acl'
 require File.dirname(__FILE__) + '/dav_error'
 require File.dirname(__FILE__) + '/errors'
 require File.dirname(__FILE__) + '/lock_discovery'
-require File.dirname(__FILE__) + '/rexml_fixes'
 require File.dirname(__FILE__) + '/utility'
 require File.dirname(__FILE__) + '/sub_response'
 
@@ -11,6 +10,9 @@ module RubyDav
   # Response classes returned when RubyDav.method is called
   # base Response class
   class Response
+
+    include Utility
+    include LibXML
 
     attr_reader :url
 
@@ -63,6 +65,11 @@ module RubyDav
         return v
       end
     end
+
+    class << self
+      include Utility
+      include LibXML
+    end
     
   end
 
@@ -114,35 +121,42 @@ module RubyDav
       return @unauthorized
     end
 
-    def self.create(url,status,headers,body,method)
-      responses = {}
-      root = REXML::Document.new(body).root
+    class << self
+      def create(url,status,headers,body,method)
+        responses = {}
+        root = XML::Document.string(body).root
 
-      raise BadResponseError unless (root.namespace == "DAV:" and root.name == "multistatus")
+        raise BadResponseError unless node_has_name? root, 'multistatus'
 
-      description = RubyDav.xpath_text root, 'responsedescription'
-      
-      response_elements = RubyDav.xpath_match root, "response"
-      raise BadResponseError if response_elements.empty?
-
-      response_elements.each do |response_element|
-        sub_status_str = RubyDav.xpath_text response_element, "status"
-        sub_status = RubyDav.parse_status sub_status_str
-        error_elem = RubyDav.xpath_first response_element, 'error'
-        error = DavError.parse_dav_error error_elem
-        sub_description = RubyDav.xpath_text response_element, 'responsedescription'
-        location = RubyDav.xpath_text response_element, 'location'
+        description = find_first_text root, 'D:responsedescription'
         
-        hrefs = RubyDav.xpath_match response_element, "href/text()"
-        hrefs.each do |href|
-          raise BadResponseError if responses.include? href
-          responses[href.to_s] =
-            SubResponse.new href.to_s, sub_status, error, sub_description, location
-        end
-      end
-      MultiStatusResponse.new(url, status, headers, body, responses, method, description)
-    end
+        find(root, "D:response") do |response_elements|
+          
+          raise BadResponseError if response_elements.empty?
 
+          response_elements.each do |response_element|
+            sub_status_str = find_first_text response_element, "D:status"
+            sub_status = parse_status sub_status_str
+            error_elem = find_first response_element, 'D:error'
+            error = DavError.parse error_elem
+            sub_description = find_first_text response_element, 'D:responsedescription'
+            location = find_first_text response_element, 'D:location'
+            
+            find(response_element, "D:href/text()") do |hrefs|
+              hrefs.each do |href|
+                raise BadResponseError if responses.include? href
+                responses[href.to_s] =
+                  SubResponse.new href.to_s, sub_status, error, sub_description, location
+              end
+            end
+          end
+        end
+        return MultiStatusResponse.new(url, status, headers, body,
+                                       responses, method, description)
+      end
+
+      RubyDav.gc_protect self, :create
+    end
 
     private
     def initialize(url, status, headers, body, responses, method=nil, description=nil)
@@ -193,13 +207,15 @@ module RubyDav
       end
 
       def parse_body(body)
-        root = REXML::Document.new(body).root
-        ld_elem = RubyDav.xpath_first root, '/prop/lockdiscovery'
+        root = XML::Document.string(body).root
+        ld_elem = find_first root, '/D:prop/D:lockdiscovery'
         raise BadResponseError if ld_elem.nil?
         return RubyDav::LockDiscovery.from_elem(ld_elem)
       rescue ArgumentError
         raise BadResponseError
       end
+
+      RubyDav.gc_protect self, :parse_body
 
     end
     
@@ -244,15 +260,20 @@ module RubyDav
     attr_reader :dav_error, :body
 
     def self.create(url, status, headers, body, method)
-        root = REXML::Document.new(body).root
-        dav_error = DavError.parse_dav_error(root)
-        self.new(url, status, headers, body, dav_error)
+      dav_error = if body.nil?
+                    nil
+                  else
+                    root = XML::Document.string(body).root
+                    DavError.parse root
+                  end
+      
+      self.new(url, status, headers, body, dav_error)
     end
 
     def initialize(url, status, headers, body, dav_error=nil)
-        @body = body
-        @dav_error = dav_error
-        super(url, status, headers)
+      @body = body
+      @dav_error = dav_error
+      super(url, status, headers)
     end
   end
 
@@ -365,15 +386,19 @@ module RubyDav
     attr_reader :dav_error
 
     def self.create(url, status, headers, body, method)
-        root = REXML::Document.new(body).root
-        dav_error = DavError.parse_dav_error(root)
-        self.new(url, status, headers, body, dav_error)
+      dav_error = if body.nil?
+                    nil
+                  else
+                    root = XML::Document.string(body).root
+                    DavError.parse root
+                  end
+      self.new(url, status, headers, body, dav_error)
     end
 
     def initialize(url, status, headers, body, dav_error=nil)
-        @body = body
-        @dav_error = dav_error
-        super(url, status, headers)
+      @body = body
+      @dav_error = dav_error
+      super(url, status, headers)
     end
   end
 
@@ -457,18 +482,20 @@ module RubyDav
           next h.include?(pk) ? h[pk] : nil
         end
         
-        RubyDav.xpath_match(parent_elem, 'propstat').each do |ps_elem|
-          status_elem = RubyDav.xpath_first(ps_elem, 'status')
-          raise BadResponseError if status_elem.nil?
-          status = RubyDav.parse_status status_elem.text
+        find(parent_elem, 'D:propstat') do |propstats|
+          propstats.each do |ps_elem|
+            status_text = find_first_text ps_elem, 'D:status'
+            raise BadResponseError if status_text.nil?
+            status = parse_status status_text
 
-          dav_error_elem = RubyDav.xpath_first ps_elem, 'error'
-          dav_error = DavError.parse_dav_error dav_error_elem
+            dav_error_elem = find_first ps_elem, 'D:error'
+            dav_error = DavError.parse dav_error_elem
 
-          RubyDav.xpath_first(ps_elem, 'prop').each_element do |property|
-            pk = PropKey.get(property.namespace, property.name)
-            result = PropertyResult.new pk, status, property, dav_error
-            properties[pk] = result
+            find_first(ps_elem, 'D:prop').each_element do |property|
+              pk = PropKey.get(namespace_href(property), property.name)
+              result = PropertyResult.new pk, status, property, dav_error
+              properties[pk] = result
+            end
           end
         end
 
@@ -477,16 +504,22 @@ module RubyDav
 
       # returns hash of hashes: url -> PropKey -> PropertyResult
       def parse_body body, url
-        root = REXML::Document.new(body).root
-        raise BadResponseError unless (root.namespace == "DAV:" && root.name == "multistatus")
-        return RubyDav.xpath_match(root, 'response').inject({}) do |h, r|
-          href_elem = RubyDav.xpath_first r, 'href'
-          raise BadResponseError if href_elem.nil?
-          href = href_elem.text
-          h[href] = parse_propstats r
-          next h
+        root = XML::Document.string(body).root
+        assert_elem_name root, 'multistatus'
+
+        find(root, 'D:response') do |responses|
+          return responses.inject({}) do |h, r|
+            href = find_first_text r, 'D:href'
+            raise BadResponseError if href.nil?
+            h[href] = parse_propstats r
+            next h
+          end
         end
+      rescue ArgumentError
+        raise BadResponseError
       end
+
+      RubyDav.gc_protect self, :parse_body, :parse_propstats
 
     end
     
@@ -500,11 +533,11 @@ module RubyDav
       private
 
       def parse_body body, url
-        root = REXML::Document.new(body).root
-        raise BadResponseError unless
-          (root.namespace == "DAV:" && root.name == "mkcol-response")
-
+        root = XML::Document.string(body).root
+        assert_elem_name root, 'mkcol-response'
         return { url => parse_propstats(root) }
+      rescue ArgumentError
+        raise BadResponseError
       end
     end
   end

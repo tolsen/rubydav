@@ -14,9 +14,9 @@ module RubyDav
 
       def from_elem elem
         RubyDav.assert_elem_name elem, 'supportedlock'
-        return new(*RubyDav.xpath_match(elem, 'lockentry').map do |e|
-                     LockEntry.from_elem e
-                   end)
+        RubyDav.find elem, 'D:lockentry' do |elems|
+          return new(*elems.map { |e| LockEntry.from_elem e })
+        end
       end
     end
 
@@ -40,8 +40,8 @@ module RubyDav
       def from_elem elem
         RubyDav.assert_elem_name elem, 'lockentry'
 
-        type_child = RubyDav.xpath_first elem, 'locktype/*'
-        scope_child = RubyDav.xpath_first elem, 'lockscope/*'
+        type_child = RubyDav.find_first elem, 'D:locktype/*'
+        scope_child = RubyDav.find_first elem, 'D:lockscope/*'
         raise ArgumentError if type_child.nil? || scope_child.nil?
 
         type = type_child.name.to_sym
@@ -49,6 +49,9 @@ module RubyDav
         
         return new(type, scope)
       end
+
+      RubyDav.gc_protect self, :from_elem
+      
     end
   end
 end

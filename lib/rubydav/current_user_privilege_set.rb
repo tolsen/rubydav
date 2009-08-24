@@ -13,9 +13,15 @@ module RubyDav
     class << self
 
       def from_elem elem
-        elems = RubyDav::xpath_match elem, 'privilege/*'
-        return new(*elems.map { |p| PropKey.get p.namespace, p.name })
+        privileges = nil
+        RubyDav.find(elem, 'D:privilege/*') do |elems|
+          privileges = elems.map do |p|
+            next PropKey.get(RubyDav.namespace_href(p), p.name)
+          end
+        end
+        return new(*privileges)
       end
+      
     end
 
     [ :current_user_privilege_set, :cups ].each do |method_name|
