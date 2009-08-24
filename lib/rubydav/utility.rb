@@ -6,6 +6,10 @@ require 'libxml'
 
 require File.dirname(__FILE__) + '/errors'
 
+# Debian Lenny's version of libxml complains too much that
+# DAV: is not a valid URI
+LibXML::XML.default_warnings = false
+
 module RubyDav
 
   module Utility
