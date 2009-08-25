@@ -173,6 +173,27 @@ class WebDavSearchTest < Test::Unit::TestCase
     delete_coll 'testsearch'
   end
 
+  def test_search_lb_is_bit
+    new_coll 'bits'
+    new_coll 'bits/bit1'
+    new_coll 'bits/bit2'
+    new_file 'bits/nonbit1'
+
+    where = is_bit
+    scope = { homepath => :infinity }
+    response = @request.search('', scope, where, :allprop)
+
+    # search should return 2 results
+    assert_num_search_results 2, response
+
+    # make sure we got both bits
+    assert_not_nil response[homepath + 'bits/bit1']
+    assert_not_nil response[homepath + 'bits/bit2']
+
+    # cleanup
+    delete_coll 'bits'
+  end
+
   def test_search_is_defined
     file1 = 'file1'
     file2 = 'file2'
