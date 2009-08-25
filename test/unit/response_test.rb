@@ -58,13 +58,34 @@ class ErrorResponseTest < Test::Unit::TestCase
     @response = RubyDav::ErrorResponse.create("www.example.org", "404", {}, "", :get)
   end
 
-  def test_simple
-    assert_instance_of RubyDav::ErrorResponse, @response
-  end
-  
   def test_error
     assert @response.error?
   end
+  
+  def test_simple
+    assert_instance_of RubyDav::ErrorResponse, @response
+  end
+
+  def test_xml_content_type__application_xml
+    hdrs = { 'content-type' => [ 'bar', 'application/xml; charset=iso-8859-1' ] }
+    assert RubyDav::ErrorResponse.xml_content_type?(hdrs)
+  end
+  
+  def test_xml_content_type__image_svg_xml
+    hdrs = { 'content-type' => [ 'image/svg+xml ' ] }
+    assert RubyDav::ErrorResponse.xml_content_type?(hdrs)
+  end
+  
+  def test_xml_content_type__not_xml
+    hdrs = { 'content-type' => [ 'foo', 'bar' ] }
+    assert !RubyDav::ErrorResponse.xml_content_type?(hdrs)
+  end
+  
+  def test_xml_content_type__text_xml
+    hdrs = { 'content-type' => [ 'text/xml', 'foo' ] }
+    assert RubyDav::ErrorResponse.xml_content_type?(hdrs)
+  end
+  
 end
 
 class OkLockResponseTest < Test::Unit::TestCase

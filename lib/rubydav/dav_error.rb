@@ -5,12 +5,13 @@ module RubyDav
 
   class DavError
 
-    attr_reader :name, :element
+    attr_reader :name, :element, :condition
 
     def initialize element
       raise BadResponseError unless RubyDav.node_has_name? element, 'error'
       @element = element
       @name = element.name
+      @condition = element.children.find { |n| n.element? }
     end
 
     def self.parse element

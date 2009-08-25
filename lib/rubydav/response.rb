@@ -100,6 +100,28 @@ module RubyDav
     def error?
       true
     end
+
+    class << self
+
+      def xml_content_type? headers
+        return (headers['content-type'].any? do |v|
+                  v =~ /((^(application|text)\/xml)|\+xml)(\s|;|$)/
+                end)
+      end
+      
+      def parse_dav_error headers, body
+        derror = nil
+        if !body.nil? && xml_content_type?(headers)
+          begin
+            root = XML::Document.string(body).root
+            derror = DavError.parse root
+          rescue XML::Error  # possibly not a proper xml body
+          end
+        end
+        return derror
+      end
+    end
+    
   end
 
   # multistatus response class, status 207. It provides status for multiple
@@ -255,18 +277,13 @@ module RubyDav
   # that response.
   class AlreadyReportedResponse < SuccessfulResponse ; end
 
+  require 'pp'
   # client error response class, 4xx series
   class ClientErrorResponse < ErrorResponse
     attr_reader :dav_error, :body
 
     def self.create(url, status, headers, body, method)
-      dav_error = if body.nil?
-                    nil
-                  else
-                    root = XML::Document.string(body).root
-                    DavError.parse root
-                  end
-      
+      dav_error = parse_dav_error headers, body
       self.new(url, status, headers, body, dav_error)
     end
 
@@ -386,12 +403,7 @@ module RubyDav
     attr_reader :dav_error
 
     def self.create(url, status, headers, body, method)
-      dav_error = if body.nil?
-                    nil
-                  else
-                    root = XML::Document.string(body).root
-                    DavError.parse root
-                  end
+      dav_error = parse_dav_error headers, body
       self.new(url, status, headers, body, dav_error)
     end
 
