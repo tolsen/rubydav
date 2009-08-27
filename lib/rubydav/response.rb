@@ -135,7 +135,7 @@ module RubyDav
     attr_reader :responses
     
     def error?
-      @method == :copy || :lock
+      [:copy, :lock].include? @method
     end
 
     def unauthorized?
