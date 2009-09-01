@@ -40,4 +40,5 @@ class WebDavLimeBitsbitmarksTest < Test::Unit::TestCase
     assert_equal '207', response.status
     assert_match /\/users\/limestone/, response[:owner].value
   end
+
 end

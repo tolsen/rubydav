@@ -426,11 +426,59 @@ END_OF_WHERE
     delete_file 'test_search'
   end
 
+  def test_lb_bitmarks_search
+    new_coll 'bits'
+    new_coll 'bits/bit1'
+    new_coll 'bits/bit2'
+    new_file 'bits/nonbit1'
+    new_file 'nonbit2'
+
+    mark 'bits/bit1', 'name', 'Bit 1'
+    mark 'bits/bit2', 'name', 'Bit 2'
+    mark 'bits/bit1', 'tag', 'yellow'
+
+    where = is_bit
+    scope = { homepath => :infinity }
+    response = @request.search('', scope, where, 
+                            :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 2, response
+
+    # TODO: test the actual bitmarks returned
+
+    ensure
+        delete_coll 'bits'
+        delete_file 'nonbit2'
+  end
+
+  def mark bit, name, value
+    uuid = get_uuid bit
+    tagp_key = bm_key name
+    uniq = Time.new.to_f * 1000
+
+    response = @request.mkcol('/bitmarks/' + uuid, :if_none_match => '*')
+    new_coll '/bitmarks/' + uuid + '/' + uniq.to_s
+    response = @request.proppatch('/bitmarks/' + uuid + '/' + uniq.to_s, { tagp_key => value })
+    assert_equal '207', response.status
+    assert_equal '200', response[tagp_key].status
+  end
+
+  def get_uuid bit
+    response = @request.propfind(bit, 0, :"resource-id")
+    assert_equal '207', response.status
+    value = RubyDav.xpath_match response[:"resource-id"].element, "href/text()"
+    return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
+  end
+
   def assert_num_search_results exp, response
     assert_equal exp, response.resources.length
   end
 
   def homepath
     URI.parse(@host).path
+  end
+
+  def bm_key name
+    RubyDav::PropKey.get('http://limebits.com/ns/1.0/', name )
   end
 end
