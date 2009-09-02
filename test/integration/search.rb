@@ -190,8 +190,18 @@ class WebDavSearchTest < Test::Unit::TestCase
     assert_not_nil response[homepath + 'bits/bit1']
     assert_not_nil response[homepath + 'bits/bit2']
 
+    response = @request.search('', { homepath + 'bits' => '1' }, where, :allprop)
+
+    # search should return 2 results
+    assert_num_search_results 2, response
+
+    # make sure we got both bits
+    assert_not_nil response[homepath + 'bits/bit1']
+    assert_not_nil response[homepath + 'bits/bit2']
+
     # cleanup
-    delete_coll 'bits'
+    ensure
+        delete_coll 'bits'
   end
 
   def test_search_is_defined
