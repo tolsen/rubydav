@@ -1,4 +1,7 @@
 require 'test/unit/assertions'
+require File.dirname(__FILE__) + '/../../lib/rubydav.rb'
+require File.dirname(__FILE__) + '/../../lib/rubydav/acl.rb'
+require File.dirname(__FILE__) + '/../../lib/limestone.rb'
 
 module WebDavTestUtils
   include Test::Unit::Assertions
