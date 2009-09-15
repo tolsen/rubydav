@@ -461,6 +461,31 @@ END_OF_WHERE
         delete_file 'nonbit2'
   end
 
+  def test_search_lb_lastmodified
+    new_coll 'bits'
+    new_coll 'bits/bit1'
+    new_coll 'bits/bit2'
+    new_file 'bits/bit1/index.html'
+
+    sleep 3
+    new_file 'bits/bit2/index.html'
+    
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:lastmodified, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit2']
+
+    sleep 3
+    put_file_w_size 'bits/bit1/index.html', 50
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:lastmodified, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit1']
+
+    ensure
+    delete_coll 'bits'
+  end
+
   def mark bit, name, value
     uuid = get_uuid bit
     tagp_key = bm_key name
