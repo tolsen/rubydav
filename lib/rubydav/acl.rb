@@ -46,7 +46,7 @@ module RubyDav
         (@action == other.action) &&
         (@principal == other.principal) &&
         (@isprotected == other.protected?) &&
-        (@privileges == other.privileges)
+        (@privileges.sort == other.privileges.sort)
     end
     alias eql? ==
 

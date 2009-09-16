@@ -86,7 +86,12 @@ class AceTest < RubyDavUnitTestCase
     end
     assert @ace != ace
   end
-  
+
+  def test_equality__privileges_in_different_order
+    newace = create_ace :grant, :all, true, "read", "write"
+    assert @ace == newace
+  end
+    
   def test_compactable
     ace = create_ace :grant, :all, true, "read-acl"
     assert @ace.compactable?(ace) 
