@@ -48,6 +48,13 @@ END_OF_DEF
     return xmlstr
   end
 
+  def is_bit
+    xmlstr = ""
+    xml = ::Builder::XmlMarkup.new(:indent => 2, :target => xmlstr)
+    xml.LB(:"is-bit", "xmlns:LB" => "http://limebits.com/ns/1.0/")
+    return xmlstr
+  end
+
   def is_defined propkey
     xmlstr = ""
     xml = ::Builder::XmlMarkup.new(:indent => 2, :target => xmlstr)
