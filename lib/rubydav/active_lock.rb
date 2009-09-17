@@ -37,7 +37,7 @@ module RubyDav
         al_elements =
           [:locktype, :lockscope, :depth, :owner,
            :timeout, :locktoken, :lockroot].inject({}) do |h, k|
-          h[k] = RubyDav.xpath_first elem, k.to_s
+          h[k] = RubyDav.find_first elem, "D:#{k.to_s}"
           next h
         end
 
@@ -45,15 +45,15 @@ module RubyDav
         raise ArgumentError if
           al_elements.values_at(*required_elements).any? { |v| v.nil? }
 
-        type = al_elements[:locktype].elements[1].name.to_sym
-        scope = al_elements[:lockscope].elements[1].name.to_sym
+        type = al_elements[:locktype].first.name.to_sym
+        scope = al_elements[:lockscope].first.name.to_sym
         depth = parse_depth al_elements[:depth]
 
         # These elements are optional inside of DAV:activelock
         # (DAV:lockroot was introduced in RFC 4918)
         owner = timeout = token = root = nil
 
-        owner = al_elements[:owner].inner_xml.to_s.strip unless
+        owner = RubyDav.inner_xml_copy(al_elements[:owner]).strip unless
           al_elements[:owner].nil?
 
         timeout = parse_timeout(al_elements[:timeout]) unless
@@ -68,14 +68,14 @@ module RubyDav
         return new(type, scope, depth, timeout, owner, token, root)
       end
         
-      def parse_element_with_href(element)
-        href = RubyDav.xpath_first element, "href"
+      def parse_element_with_href element
+        href = RubyDav.find_first_text element, 'D:href'
         raise ArgumentError if href.nil?
-        return href.text.strip
+        return href.strip
       end
 
       def parse_depth depth_element
-        depth_text = depth_element.text.strip
+        depth_text = depth_element.content
         return case depth_text
                when '0', '1' then depth_text.to_i
                when 'infinity' then INFINITY
@@ -84,13 +84,15 @@ module RubyDav
       end
 
       def parse_timeout(timeout)
-        timeout = timeout.text.strip
+        timeout = timeout.content
         return case timeout
                when /Second-\d+/ then timeout.split('-')[1].to_i
                when /Infinite/ then INFINITY
                else raise ArgumentError
                end
       end
+
+      RubyDav.gc_protect self, :from_elem
       
     end
   end

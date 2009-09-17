@@ -9,8 +9,8 @@ class WebDavDeltavTest < Test::Unit::TestCase
   end
 
   def href_elem_to_url prop_result
-    href_element = RubyDav.xpath_first prop_result.element, 'href'
-    href = RubyDav.remove_trailing_slashes(href_element.text)
+    href_element = RubyDav.find_first prop_result.element, 'D:href'
+    href = RubyDav.remove_trailing_slashes(href_element.content)
     return "http://#{@uri.host}:#{@uri.port}" + href
   end
 

@@ -3,12 +3,12 @@ require 'test/unit/unit_test_helper'
 class RubyDavPropKeyTest < RubyDavUnitTestCase
 
   def generate_and_assert_propkey_xml propkey, expected_xml
-    assert (normalized_rexml_equal expected_xml, propkey.printXML)
+    assert xml_equal?(expected_xml, propkey.printXML)
   end
   
   def generate_and_assert_propkey_xml_with_value propkey, value, expected_xml
     propkey_xml = propkey.printXML nil, value
-    assert normalized_rexml_equal(expected_xml, propkey_xml)
+    assert xml_equal?(expected_xml, propkey_xml)
   end
   
   def test_compare

@@ -33,6 +33,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/webdav'
 
+  require 'rubygems'
   require 'log4r'
   require 'shared-mime-info'
 
@@ -903,7 +904,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       
       ############################################################
 
-
+      def base_url() @global_opts[:base_url]; end
+      
       # tries at most one request which may return a 401
       def try_request httpmethod, uri, stream, auth, options
         requesturl = uri.path
@@ -1045,7 +1047,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
         return response
       end
-      
+
       def request(httpmethod, url = "", stream = nil, options = {})
         if options.include? :destination
           options[:destination] = fullurl options[:destination]
@@ -1056,7 +1058,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
           options[:content_type] = mimetype.nil? ? 'text/plain' : mimetype.type
         end
         
-        options = @global_opts.merge options
+        options = merge_request_options options
         uri = URI.join(options[:base_url], url)
 
         
@@ -1159,6 +1161,32 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       def fullurl url
         URI.join(@global_opts[:base_url], url).to_s
       end
+
+      private
+
+      # returns merge of options with @global_opts
+      # resolves conflicts between some options
+      def merge_request_options options
+        options2 = @global_opts.merge options
+
+        # resolve conflict between :digest_a1 and :password options
+        # by taking the on given in this request call
+        if options2.include?(:digest_a1) && options2.include?(:password)
+          if @global_opts.include? :digest_a1
+            raise("both digest_a1 and password specified " +
+                  "when Request was created") if
+              @global_opts.include? :password
+            options2.delete :digest_a1
+          elsif @global_opts.include? :password
+            options2.delete :password
+          else
+            # both options must have been specified at call time
+            raise "both digest_a1 and password specified"
+          end
+        end
+        return options2
+      end
+      
 
     end
   end

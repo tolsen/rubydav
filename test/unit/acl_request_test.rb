@@ -73,7 +73,7 @@ class AclRequestTest < RubyDavUnitTestCase
   def validate_acl(request,body)
     (request.is_a?(Net::HTTP::Acl)) && 
       (request.path == @host_path) && 
-      (body.nil? || normalized_rexml_equal(body,request.body_stream.read))
+      (body.nil? || xml_equal?(body,request.body_stream.read))
   end
 
   # body=nil skips request.body validation, only headers are verified,

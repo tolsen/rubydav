@@ -46,9 +46,14 @@ module RubyDav
         (@action == other.action) &&
         (@principal == other.principal) &&
         (@isprotected == other.protected?) &&
-        (@privileges == other.privileges)
+        (@privileges.sort == other.privileges.sort)
     end
-    alias eql? == 
+    alias eql? ==
+
+    def hash
+      return ("#{self.class.hash}/#{@action.hash}/#{@principal.hash}" +
+              "/#{@isprotected.hash}/#{@privileges.hash}").hash
+    end
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
@@ -92,21 +97,23 @@ module RubyDav
     class << self
 
       def from_elem elem
-        protected = !RubyDav::xpath_first(elem, 'protected').nil?
+        protected = !RubyDav.find_first(elem, 'D:protected').nil?
         inherited_url =
-          RubyDav::xpath_first elem, 'inherited/href/text()'
+          RubyDav.find_first elem, 'D:inherited/D:href/text()'
 
-        principal_elem = RubyDav::xpath_first elem, 'principal'
+        principal_elem = RubyDav.find_first elem, 'D:principal'
         raise 'no principal element found' if principal_elem.nil?
         principal = parse_principal_element principal_elem
 
-        action_elem = RubyDav::xpath_first elem, 'grant|deny'
+        action_elem = RubyDav.find_first elem, 'D:grant|D:deny'
         raise 'no grant or deny element found' if action_elem.nil?
         action = action_elem.name.to_sym
 
-        privileges =
-          RubyDav::xpath_match(action_elem, 'privilege/*').map do |e|
-          PropKey.get e.namespace, e.name
+        privileges = nil
+        RubyDav.find(action_elem, 'D:privilege/*') do |privilege_elements|
+          privileges = privilege_elements.map do |e|
+            PropKey.get RubyDav.namespace_href(e), e.name
+          end
         end
 
         if inherited_url.nil?
@@ -125,19 +132,21 @@ module RubyDav
       end
 
       def parse_principal_element principal_elem
-        if (href = RubyDav::xpath_first principal_elem, 'href/text()')
-          return href.to_s
-        elsif (property = RubyDav::xpath_first principal_elem, 'property/*')
-          return PropKey.get(property.namespace, property.name)
+        if (href = RubyDav.find_first_text principal_elem, 'D:href')
+          return href
+        elsif (property = RubyDav.find_first principal_elem, 'D:property/*')
+          return PropKey.get(RubyDav.namespace_href(property), property.name)
         else
           %w(all authenticated unauthenticated self).each do |name|
-            property = RubyDav::xpath_first principal_elem, name
+            property = RubyDav.find_first principal_elem, "D:#{name}"
             return name.to_sym unless property.nil?
           end
 
           raise "invalid principal element: #{principal_elem.to_s}"
         end
       end
+
+      RubyDav.gc_protect self, :from_elem, :parse_principal_element
     end
   end
   
@@ -231,7 +240,11 @@ module RubyDav
     class << self
       
       def from_elem elem
-        Acl[*RubyDav::xpath_match(elem, 'ace').map { |e| Ace.from_elem e }]
+        aces = nil
+        RubyDav.find(elem, 'D:ace') do |ace_elems|
+          aces = ace_elems.map { |e| Ace.from_elem e }
+        end
+        return Acl[*aces]
       end
       
     end

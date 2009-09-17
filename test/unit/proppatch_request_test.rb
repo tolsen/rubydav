@@ -47,7 +47,7 @@ EOS
   def validate_proppatch(request,body)
     (request.is_a?(Net::HTTP::Proppatch)) &&
       (request.path == @url_path) &&
-      (normalized_rexml_equal(body,request.body_stream.read))
+      (xml_equal?(body,request.body_stream.read))
   end
   
 end
