@@ -436,7 +436,7 @@ END_OF_WHERE
     delete_file 'test_search'
   end
 
-  def test_lb_bitmarks_search
+  def test_search_lb_bitmarks
     new_coll 'bits'
     new_coll 'bits/bit1'
     new_coll 'bits/bit2'
@@ -451,6 +451,11 @@ END_OF_WHERE
     scope = { homepath => :infinity }
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 2, response
+
+    response = @request.search('', scope, where, 
+                            :getlastmodified, :bitmarks => ["tag"])
     assert_equal '207', response.status
     assert_num_search_results 2, response
 
