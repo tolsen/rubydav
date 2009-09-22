@@ -786,8 +786,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       def search(url, scope, wherexml, *props)
         options = props.last.is_a?(Hash) ? props.pop.dup : {}
         
-        nresults, orderlist, offset =
-          options.values_at :limit, :orderby, :offset
+        nresults, orderlist, offset, bitmarks =
+          options.values_at :limit, :orderby, :offset, :bitmarks
 
         stream = RubyDav.build_xml_stream do |xml|
           xml.D(:searchrequest, "xmlns:D" => "DAV:") do
@@ -800,6 +800,14 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                     props.each do |prop|
                       propkey = PropKey.strictly_prop_key(prop)
                       propkey.printXML xml
+                    end
+                  end
+                  if !bitmarks.nil?
+                    xml.LB(:bitmark, 
+                           "xmlns:LB" => "http://limebits.com/ns/1.0") do
+                        bitmarks.each do |bitmark|
+                            xml.LB(bitmark.to_sym)
+                        end
                     end
                   end
                 end
