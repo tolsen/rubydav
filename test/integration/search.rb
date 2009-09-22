@@ -440,24 +440,29 @@ END_OF_WHERE
     new_coll 'bits'
     new_coll 'bits/bit1'
     new_coll 'bits/bit2'
+    new_coll 'bits/bit3'
+    new_coll 'bits/bit4'
     new_file 'bits/nonbit1'
     new_file 'nonbit2'
 
     mark 'bits/bit1', 'name', 'Bit 1'
     mark 'bits/bit2', 'name', 'Bit 2'
     mark 'bits/bit1', 'tag', 'yellow'
+    mark 'bits/bit3', 'tag', 'green'
+    mark 'bits/bit3', 'tag', 'clean'
+    
 
     where = is_bit
     scope = { homepath => :infinity }
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag", "name"])
     assert_equal '207', response.status
-    assert_num_search_results 2, response
+    assert_num_search_results 4, response
 
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag"])
     assert_equal '207', response.status
-    assert_num_search_results 2, response
+    assert_num_search_results 4, response
 
     # TODO: test the actual bitmarks returned
 
