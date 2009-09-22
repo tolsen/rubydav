@@ -452,7 +452,6 @@ END_OF_WHERE
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag", "name"])
     assert_equal '207', response.status
-    puts response.body
     assert_num_search_results 2, response
 
     # TODO: test the actual bitmarks returned
@@ -502,7 +501,7 @@ END_OF_WHERE
   def get_uuid bit
     response = @request.propfind(bit, 0, :"resource-id")
     assert_equal '207', response.status
-    value = RubyDav.find_first_text response[:"resource-id"].element, "href"
+    value = RubyDav.find_first_text response[:"resource-id"].element, "D:href"
     return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
   end
 
