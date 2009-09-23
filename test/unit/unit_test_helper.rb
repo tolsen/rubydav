@@ -1,29 +1,24 @@
 require 'tempfile'
 
+require 'rubygems'
+require 'libxml'
+
 require 'test/test_helper'
 
 class RubyDavUnitTestCase < RubyDavTestCase
   
-  ASSERT_REXML_INDENT=2
-
-  def normalized_rexml_equal(expected, actual) # unit
-    document_context = {
-      :compress_whitespace => :all,
-      :ignore_whitespace_nodes => :all
+  def xml_equal? expected, actual
+    opts = { :options =>
+      (LibXML::XML::Parser::Options::NOENT |
+       LibXML::XML::Parser::Options::NOBLANKS)# |
+      # Debian Lenny is having trouble finding the COMPACT constant
+#       LibXML::XML::Parser::Options::COMPACT)
     }
-
-    normalized_expected = REXML::Document.new(expected, document_context).to_s(ASSERT_REXML_INDENT)
-    normalized_actual = REXML::Document.new(actual, document_context).to_s(ASSERT_REXML_INDENT)
-
-#     puts "EXPECTED"
-#     puts normalized_expected
-#     puts
-#     puts "ACTUAL" 
-#     puts normalized_actual
-#     puts
-    
+    normalized_expected = LibXML::XML::Document.string(expected, opts).to_s
+    normalized_actual = LibXML::XML::Document.string(actual, opts).to_s
     return normalized_expected == normalized_actual
   end
+  
   
   def create_ace_principal_xml principal
     if (Symbol === principal) && (principal != :all) && (principal != :self) &&
@@ -151,7 +146,7 @@ EOS
 EOS
 
     @supported_privilege_set_elem =
-      REXML::Document.new(supported_privilege_set_str).root
+      LibXML::XML::Document.string(supported_privilege_set_str).root
 
     @all_priv = RubyDav::PropKey.get 'DAV:', 'all'
     @read_priv = RubyDav::PropKey.get 'DAV:', 'read'
@@ -171,7 +166,7 @@ EOS
   end
 
   def body_root_element body
-    return REXML::Document.new(body).root
+    return LibXML::XML::Document.string(body).root
   end
   
 end

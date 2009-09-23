@@ -25,15 +25,15 @@ module RubyDav
     end
 
     def inner_value
-      element.nil? ? nil : element.inner_xml
+      element.nil? ? nil : RubyDav.inner_xml_copy(element)
     end
 
     def success?
-      status == '200'
+      (status.to_i / 100) == 2
     end
 
     def value
-      element.nil? ? nil : element.to_s_with_ns
+      element.nil? ? nil : RubyDav.to_s_copy(element)
     end
 
     class << self

@@ -152,7 +152,7 @@ EOS
     (request.is_a?(Net::HTTP::Propfind)) &&
       (request.path == @url_path) &&
       (request['depth'].downcase == depth.to_s.downcase) &&
-      (normalized_rexml_equal(body, request.body_stream.read))
+      (xml_equal?(body, request.body_stream.read))
   end
   
 

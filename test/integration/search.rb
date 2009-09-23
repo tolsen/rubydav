@@ -456,9 +456,9 @@ END_OF_WHERE
 
     # TODO: test the actual bitmarks returned
 
-    ensure
-        delete_coll 'bits'
-        delete_file 'nonbit2'
+  ensure
+    delete_coll 'bits'
+    delete_file 'nonbit2'
   end
 
   def test_search_lb_lastmodified
@@ -501,7 +501,7 @@ END_OF_WHERE
   def get_uuid bit
     response = @request.propfind(bit, 0, :"resource-id")
     assert_equal '207', response.status
-    value = RubyDav.xpath_match response[:"resource-id"].element, "href/text()"
+    value = RubyDav.find_first_text response[:"resource-id"].element, "D:href"
     return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
   end
 

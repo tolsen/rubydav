@@ -11,7 +11,7 @@ class SupportedPrivilegeTest < RubyDavUnitTestCase
   def setup
     super
     @supported_privilege_elem =
-      RubyDav::xpath_first @supported_privilege_set_elem, 'supported-privilege'
+      RubyDav.find_first @supported_privilege_set_elem, 'D:supported-privilege'
 
     @write_content_spriv =
       RubyDav::SupportedPrivilege.new @write_content_priv, 'write content', 'en'

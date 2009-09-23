@@ -117,7 +117,7 @@ module WebDavTestUtils
                 else
                   response_or_dav_error
                 end
-    assert_equal dav_error.condition.name, condition
+    assert_equal condition, dav_error.condition.name
   end
 
   def resize_file(path, size)
