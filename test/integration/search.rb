@@ -462,10 +462,7 @@ END_OF_WHERE
   end
 
   def test_search_lb_lastmodified
-    new_coll 'bits'
-    new_coll 'bits/bit1'
-    new_coll 'bits/bit2'
-    new_file 'bits/bit1/index.html'
+    setup_bits
 
     sleep 3
     new_file 'bits/bit2/index.html'
@@ -484,6 +481,39 @@ END_OF_WHERE
 
     ensure
     delete_coll 'bits'
+  end
+
+  def test_search_popularity
+    setup_bits
+
+    # GET bit1, should increate it's popularity
+    @request.get('bits/bit1/index.html')
+
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit1']
+
+    new_file 'bits/bit2/index.html'
+
+    # GET bit2 twice, making it more popular than bit1
+    @request.get('bits/bit2/index.html')
+    @request.get('bits/bit2/index.html')
+
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit2']
+
+    ensure
+    delete_coll 'bits'
+  end
+
+  def setup_bits
+    new_coll 'bits'
+    new_coll 'bits/bit1'
+    new_coll 'bits/bit2'
+    new_file 'bits/bit1/index.html'
   end
 
   def mark bit, name, value
