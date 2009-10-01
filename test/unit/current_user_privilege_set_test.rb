@@ -1,4 +1,3 @@
-require 'rexml/document'
 require 'test/unit'
 
 require 'test/unit/unit_test_helper'
@@ -13,7 +12,7 @@ class CurrentUserPrivilegeSetTest < RubyDavUnitTestCase
   <privilege><write/></privilege> 
 </current-user-privilege-set>
 EOS
-    @cups_elem = REXML::Document.new(cups_str).root
+    @cups_elem = LibXML::XML::Document.string(cups_str).root
 
     @privileges = [RubyDav::PropKey.get('DAV:', 'read'),
                    RubyDav::PropKey.get('DAV:', 'write')]

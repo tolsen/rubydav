@@ -466,16 +466,13 @@ END_OF_WHERE
 
     # TODO: test the actual bitmarks returned
 
-    ensure
-        delete_coll 'bits'
-        delete_file 'nonbit2'
+  ensure
+    delete_coll 'bits'
+    delete_file 'nonbit2'
   end
 
   def test_search_lb_lastmodified
-    new_coll 'bits'
-    new_coll 'bits/bit1'
-    new_coll 'bits/bit2'
-    new_file 'bits/bit1/index.html'
+    setup_bits
 
     sleep 3
     new_file 'bits/bit2/index.html'
@@ -496,6 +493,39 @@ END_OF_WHERE
     delete_coll 'bits'
   end
 
+  def test_search_popularity
+    setup_bits
+
+    # GET bit1, should increate it's popularity
+    @request.get('bits/bit1/index.html')
+
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit1']
+
+    new_file 'bits/bit2/index.html'
+
+    # GET bit2 twice, making it more popular than bit1
+    @request.get('bits/bit2/index.html')
+    @request.get('bits/bit2/index.html')
+
+    response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
+
+    assert_num_search_results 1, response
+    assert_not_nil response[homepath + 'bits/bit2']
+
+    ensure
+    delete_coll 'bits'
+  end
+
+  def setup_bits
+    new_coll 'bits'
+    new_coll 'bits/bit1'
+    new_coll 'bits/bit2'
+    new_file 'bits/bit1/index.html'
+  end
+
   def mark bit, name, value
     uuid = get_uuid bit
     tagp_key = bm_key name
@@ -511,7 +541,7 @@ END_OF_WHERE
   def get_uuid bit
     response = @request.propfind(bit, 0, :"resource-id")
     assert_equal '207', response.status
-    value = RubyDav.xpath_match response[:"resource-id"].element, "href/text()"
+    value = RubyDav.find_first_text response[:"resource-id"].element, "D:href"
     return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
   end
 

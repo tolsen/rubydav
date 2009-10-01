@@ -24,9 +24,10 @@ module RubyDav
 
       def from_elem elem
         RubyDav.assert_elem_name elem, 'lockdiscovery'
-        return new(*RubyDav.xpath_match(elem, 'activelock').map do |l|
-                     ActiveLock.from_elem l
-                   end)
+
+        RubyDav.find elem, 'D:activelock' do |elems|
+          return new(*elems.map() { |l| ActiveLock.from_elem l } )
+        end
       end
 
     end

@@ -1,4 +1,7 @@
 require 'test/unit/assertions'
+require File.dirname(__FILE__) + '/../../lib/rubydav.rb'
+require File.dirname(__FILE__) + '/../../lib/rubydav/acl.rb'
+require File.dirname(__FILE__) + '/../../lib/limestone.rb'
 
 module WebDavTestUtils
   include Test::Unit::Assertions
@@ -114,7 +117,7 @@ module WebDavTestUtils
                 else
                   response_or_dav_error
                 end
-    assert_equal dav_error.condition.name, condition
+    assert_equal condition, dav_error.condition.name
   end
 
   def resize_file(path, size)

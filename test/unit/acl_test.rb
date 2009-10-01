@@ -5,6 +5,10 @@ class AceTest < RubyDavUnitTestCase
     super
     @ace =  create_ace :grant, :all, true, "write", "read"
   end
+
+#   def teardown
+#     GC.start
+#   end
   
   def test_create
     assert_not_nil @ace
@@ -82,7 +86,12 @@ class AceTest < RubyDavUnitTestCase
     end
     assert @ace != ace
   end
-  
+
+  def test_equality__privileges_in_different_order
+    newace = create_ace :grant, :all, true, "read", "write"
+    assert @ace == newace
+  end
+    
   def test_compactable
     ace = create_ace :grant, :all, true, "read-acl"
     assert @ace.compactable?(ace) 
@@ -128,7 +137,7 @@ class AceTest < RubyDavUnitTestCase
   <hi><privilege><read/></privilege></hi>
 </ace>
 EOS
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     assert_raises RuntimeError do
       RubyDav::Ace.from_elem ace_elem
     end
@@ -146,7 +155,7 @@ EOS
 </D:ace> 
 EOS
     
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     ace = RubyDav::Ace.from_elem ace_elem
     assert_instance_of RubyDav::Ace, ace
 
@@ -172,7 +181,7 @@ EOS
   </D:grant> 
 </D:ace> 
 EOS
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     ace = RubyDav::Ace.from_elem ace_elem
     assert_instance_of RubyDav::Ace, ace
     
@@ -200,7 +209,7 @@ EOS
 </D:ace>
 EOS
     
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     ace = RubyDav::Ace.from_elem ace_elem
     assert_instance_of RubyDav::InheritedAce, ace
 
@@ -220,7 +229,7 @@ EOS
   <grant><privilege><read/></privilege></grant>
 </ace>
 EOS
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     assert_raises RuntimeError do
       RubyDav::Ace.from_elem ace_elem
     end
@@ -235,7 +244,7 @@ EOS
 </ace>
 EOS
     
-    ace_elem = REXML::Document.new(ace_str).root
+    ace_elem = body_root_element ace_str
     ace = RubyDav::Ace.from_elem ace_elem
     assert_instance_of RubyDav::Ace, ace
     
@@ -256,7 +265,7 @@ EOS
 
   def test_parse_principal_element__all
     principal_str = "<principal xmlns='DAV:'><all/></principal>"
-    principal_elem = REXML::Document.new(principal_str).root
+    principal_elem = body_root_element principal_str
 
     result = RubyDav::Ace.parse_principal_element principal_elem
     assert_instance_of Symbol, result
@@ -265,7 +274,7 @@ EOS
 
   def test_parse_principal_element__bad_principal
     principal_str = "<principal xmlns='DAV:'><foo/></principal>"
-    principal_elem = REXML::Document.new(principal_str).root
+    principal_elem = body_root_element principal_str
     
     assert_raises RuntimeError do
       RubyDav::Ace.parse_principal_element principal_elem
@@ -274,7 +283,7 @@ EOS
   
   def test_parse_principal_element__href
     principal_str = "<principal xmlns='DAV:'><href>foo</href></principal>"
-    principal_elem = REXML::Document.new(principal_str).root
+    principal_elem = body_root_element principal_str
 
     result = RubyDav::Ace.parse_principal_element principal_elem
     assert_instance_of String, result
@@ -283,7 +292,7 @@ EOS
   
   def test_parse_principal_element__property
     principal_str = "<principal xmlns='DAV:'><property><owner/></property></principal>"
-    principal_elem = REXML::Document.new(principal_str).root
+    principal_elem = body_root_element principal_str
 
     result = RubyDav::Ace.parse_principal_element principal_elem
     assert_instance_of RubyDav::PropKey, result
@@ -439,7 +448,7 @@ class AclTest < RubyDavUnitTestCase
   </D:ace> 
 </D:acl> 
 EOS
-    @acl_elem = REXML::Document.new(acl_str).root
+    @acl_elem = body_root_element acl_str
     
     @acl = RubyDav::Acl.new
     @ace = RubyDav::Ace.new :grant, :all, true, "read-acl"
@@ -575,7 +584,7 @@ EOS
     acl_xml = String.new
     xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
     @acl.printXML xml
-    assert (normalized_rexml_equal expected_body, acl_xml)
+    assert xml_equal?(expected_body, acl_xml)
   end
   
   def test_printXML2
@@ -586,7 +595,7 @@ EOS
     acl_xml = String.new
     xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
     @acl.printXML xml
-    assert (normalized_rexml_equal expected_body, acl_xml)
+    assert xml_equal?(expected_body, acl_xml)
   end
 
   def test_property_result_class_reader

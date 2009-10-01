@@ -33,6 +33,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/webdav'
 
+  require 'rubygems'
   require 'log4r'
   require 'shared-mime-info'
 

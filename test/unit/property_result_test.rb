@@ -1,5 +1,3 @@
-require 'rexml/document'
-
 require 'test/unit/unit_test_helper'
 
 class PropertyResultTestCase < RubyDavUnitTestCase
@@ -9,7 +7,7 @@ class PropertyResultTestCase < RubyDavUnitTestCase
   def setup
     super
     displayname_str = "<D:displayname xmlns:D='DAV:'>Bob</D:displayname>"
-    @displayname_element = REXML::Document.new(displayname_str).root
+    @displayname_element = LibXML::XML::Document.string(displayname_str).root
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
     @result =
       RubyDav::PropertyResult.new @displayname_pk, '200', @displayname_element
@@ -60,9 +58,9 @@ class PropertyResultTestCase < RubyDavUnitTestCase
   def test_initialize
     assert_equal @displayname_pk, @result.prop_key
     assert_equal '200', @result.status
-    assert_equal 'DAV:', @result.element.namespace
+    assert_equal 'DAV:', RubyDav.namespace_href(@result.element)
     assert_equal 'displayname', @result.element.name
-    assert_equal 'Bob', @result.element.text.strip
+    assert_equal 'Bob', @result.element.content
     assert_nil @result.error
 
     assert_equal @displayname_pk, @error_result.prop_key
