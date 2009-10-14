@@ -452,6 +452,11 @@ END_OF_WHERE
     mark 'bits/bit3', 'tag', 'clean'
     
 
+    response = @request.search('bits/bit1', { homepath + 'bits/bit1' => 0 }, is_bit, 
+                            :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 1, response
+
     where = is_bit
     scope = { homepath => :infinity }
     response = @request.search('', scope, where, 
