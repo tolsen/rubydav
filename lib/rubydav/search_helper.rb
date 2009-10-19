@@ -11,12 +11,18 @@ module SearchHelper
     # generate comparision operators gt, lt, ....
     COMP_OPS.each do |op|
         def_op = <<END_OF_DEF
-          def #{op}(propkey, literal)
+          def #{op}(propkey, literal, is_bitmark=false)
             xmlstr = ""
             xml = ::Builder::XmlMarkup.new(:indent => 2, :target => xmlstr)
-            propkey = RubyDav::PropKey.strictly_prop_key(propkey)
+            strict_propkey = RubyDav::PropKey.strictly_prop_key(propkey)
             xml.D(:#{op}) do
-              xml.D(:prop) { propkey.printXML xml }
+              if !is_bitmark
+                xml.D(:prop) { strict_propkey.printXML xml }
+              else
+                xml.LB(:bitmark, "xmlns:LB" => "http://limebits.com/ns/1.0/") do
+                  xml.LB(propkey)
+                end
+              end
               xml.D(:literal, literal.to_s)
             end
             return xmlstr

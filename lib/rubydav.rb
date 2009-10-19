@@ -804,7 +804,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                   end
                   if !bitmarks.nil?
                     xml.LB(:bitmark, 
-                           "xmlns:LB" => "http://limebits.com/ns/1.0") do
+                           "xmlns:LB" => "http://limebits.com/ns/1.0/") do
                         bitmarks.each do |bitmark|
                             xml.LB(bitmark.to_sym)
                         end
@@ -839,7 +839,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
               end
 
               if offset
-                xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0") 
+                xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0/") 
               end
             end
           end
