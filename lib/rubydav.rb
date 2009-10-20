@@ -773,6 +773,10 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :report_version_tree, url, stream, options
       end
 
+      def report(url, stream)
+        request :report, url, stream, {}
+      end
+
       def expand_property_report(url, eprops, options={})
         stream = RubyDav.build_xml_stream do |xml|
           xml.D(:"expand-property", "xmlns:D" => "DAV:") do

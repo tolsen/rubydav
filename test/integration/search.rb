@@ -539,6 +539,57 @@ END_OF_WHERE
     delete_coll 'bits'
   end
 
+  def test_property_stats_report
+    setup_bits
+
+    # use current time as a unique value for tags
+    tag1 = Time.now.to_f
+    tag2 = tag1 + 1
+
+    mark 'bits/bit1', 'tag', tag1
+    mark 'bits/bit2', 'tag', tag1
+    mark 'bits/bit2', 'tag', tag2
+
+    stream = RubyDav.build_xml_stream do |xml|
+      xml.LB(:"property-stats", "xmlns:LB" => "http://limebits.com/ns/1.0/") do
+        xml.LB(:prop) do
+          xml.LB(:tag)
+        end
+        xml.LB(:"sample-set") do
+          xml.LB(:value, tag1.to_s)
+          xml.LB(:value, tag2.to_s)
+        end
+        xml.LB(:stat) do
+          xml.LB(:count)
+        end
+      end
+    end
+
+    response = @request.report('', stream)
+    assert_equal '200', response.status
+    assert_xml_matches response.body do |xml|
+      xml.xmlns! :LB => 'http://limebits.com/ns/1.0/'
+      xml.LB(:"property-stats") do
+        xml.LB(:prop) do
+          xml.LB(:tag)
+        end
+        xml.LB(:"sample-set") do
+          xml.LB(:stat) do
+            xml.LB(:value, tag1.to_s)
+            xml.LB(:count, "2")
+          end
+          xml.LB(:stat) do
+            xml.LB(:value, tag2.to_s)
+            xml.LB(:count, "1")
+          end
+        end
+      end
+    end
+
+    ensure
+    delete_coll 'bits'
+  end
+
   def setup_bits
     new_coll 'bits'
     new_coll 'bits/bit1'
