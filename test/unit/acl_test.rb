@@ -4,6 +4,7 @@ class AceTest < RubyDavUnitTestCase
   def setup
     super
     @ace =  create_ace :grant, :all, true, "write", "read"
+    @owner_pk = RubyDav::PropKey.get 'DAV:', 'owner'
   end
 
 #   def teardown
@@ -249,7 +250,7 @@ EOS
     assert_instance_of RubyDav::Ace, ace
     
     assert_instance_of RubyDav::PropKey, ace.principal
-    assert_equal RubyDav::PropKey.get('DAV:', 'owner'), ace.principal
+    assert_equal @owner_pk, ace.principal
 
     assert_equal :grant, ace.action
 
@@ -260,14 +261,20 @@ EOS
   def test_generalize_principal!
     ace = create_ace(:grant, 'http://neurofunk.limewire.com:8080/users/bits',
                      false, :'write-properties')
-    ace.generalize_principal!
+    assert_same ace, ace.generalize_principal!
     assert_equal '/users/bits', ace.principal
   end
 
   def test_generalize_principal__already_general
     ace = create_ace :grant, '/users/bits', false, :'write-properties'
-    ace.generalize_principal!
+    assert_same ace, ace.generalize_principal!
     assert_equal '/users/bits', ace.principal
+  end
+
+  def test_generalize_principal__property
+    ace = create_ace :grant, @owner_pk, true, :all
+    assert_same ace, ace.generalize_principal!
+    assert_equal @owner_pk, ace.principal
   end
 
   def test_hash
@@ -309,8 +316,7 @@ EOS
 
     result = RubyDav::Ace.parse_principal_element principal_elem
     assert_instance_of RubyDav::PropKey, result
-    owner_pk = RubyDav::PropKey.get 'DAV:', 'owner'
-    assert_equal owner_pk, result
+    assert_equal @owner_pk, result
   end
   
   def create_ace action, principal, protected, *privileges
@@ -569,6 +575,23 @@ EOS
                    RubyDav::Ace.new(:grant, :all, false,
                                     RubyDav::PropKey.get('DAV:', 'read'))]
     assert_equal expected_acl, acl
+  end
+
+  def test_generalize_principals!
+    expected_principals = ['/users/bits', '/users/chetan', :all]
+    
+    acl =
+      RubyDav::Acl[RubyDav::Ace.new(:grant,
+                                    'http://neurofunk.limewire.com:8080/users/bits',
+                                    false, :'write-properties'),
+                   RubyDav::Ace.new(:deny,
+                                    'http://chetan.limewire.com/users/chetan',
+                                    false, :all),
+                   RubyDav::Ace.new(:grant, :all, false, :read)]
+
+    assert_same acl, acl.generalize_principals!
+    principals = acl.map { |a| a.principal }
+    assert_equal expected_principals, principals
   end
 
   def test_hash

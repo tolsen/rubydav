@@ -99,7 +99,8 @@ module RubyDav
     @@generalize_principal_rx =
       /^#{URI::REGEXP::PATTERN::SCHEME}:\/\/#{URI::REGEXP::PATTERN::AUTHORITY}/
     def generalize_principal!
-      @principal.sub! @@generalize_principal_rx, ''
+      @principal.sub!(@@generalize_principal_rx, '') if @principal.is_a? String
+      return self
     end
 
     class << self
@@ -219,6 +220,11 @@ module RubyDav
       end
       
       super
+    end
+
+    def generalize_principals!
+      each { |p| p.generalize_principal! }
+      return self
     end
     
     def printXML(xml)
