@@ -257,6 +257,19 @@ EOS
     assert ace.protected?
   end
 
+  def test_generalize_principal!
+    ace = create_ace(:grant, 'http://neurofunk.limewire.com:8080/users/bits',
+                     false, :'write-properties')
+    ace.generalize_principal!
+    assert_equal '/users/bits', ace.principal
+  end
+
+  def test_generalize_principal__already_general
+    ace = create_ace :grant, '/users/bits', false, :'write-properties'
+    ace.generalize_principal!
+    assert_equal '/users/bits', ace.principal
+  end
+
   def test_hash
     # cannot test that hash values are different as there may be a collision
     ace2 = create_ace :grant, :all, true, "write", "read"
