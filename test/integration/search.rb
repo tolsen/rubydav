@@ -558,6 +558,7 @@ END_OF_WHERE
         xml.LB(:"sample-set") do
           xml.LB(:value, tag1.to_s)
           xml.LB(:value, tag2.to_s)
+          xml.LB(:value, 'fake')
         end
         xml.LB(:stat) do
           xml.LB(:count)
@@ -581,6 +582,10 @@ END_OF_WHERE
           xml.LB(:stat) do
             xml.LB(:value, tag2.to_s)
             xml.LB(:count, "1")
+          end
+          xml.LB(:stat) do
+            xml.LB(:value, 'fake')
+            xml.LB(:count, "0")
           end
         end
       end
