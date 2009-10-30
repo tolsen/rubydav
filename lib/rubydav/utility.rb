@@ -42,12 +42,12 @@ module RubyDav
     # returns output if new xml builder was created
     def buildXML xml = nil, &block
       output = nil
-      namespaces = []
+      namespaces = {}
       
       if xml.nil?
         output = ""
         xml = Builder::XmlMarkup.new(:indent => 2, :target => output)
-        namespaces << { 'xmlns:D' => 'DAV:' }
+        namespaces['xmlns:D'] = 'DAV:'
       end
       
       yield xml, namespaces if block_given?

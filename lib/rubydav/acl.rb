@@ -58,7 +58,7 @@ module RubyDav
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
-        xml.D :ace, *ns do
+        xml.D :ace, ns do
           xml.D :principal do
             if Symbol === @principal
               xml.D @principal

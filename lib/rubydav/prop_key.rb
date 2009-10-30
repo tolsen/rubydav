@@ -81,13 +81,13 @@ module RubyDav
         begin
           valxml = value.target!
           if @ns == "DAV:"
-            xml.D(@name.to_sym, *ns) {xml << valxml } 
+            xml.D(@name.to_sym, ns) {xml << valxml } 
           else
             xml.R(@name.to_sym, "xmlns:R" => @ns) { xml << valxml }
           end
         rescue NoMethodError
           if @ns == "DAV:"
-            xml.D(@name.to_sym, value.to_s, *ns)
+            xml.D(@name.to_sym, value.to_s, ns)
           else
             xml.R(@name.to_sym, value.to_s, "xmlns:R" => @ns )
           end
