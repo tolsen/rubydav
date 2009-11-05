@@ -602,25 +602,6 @@ END_OF_WHERE
     new_file 'bits/bit1/index.html'
   end
 
-  def mark bit, name, value
-    uuid = get_uuid bit
-    tagp_key = bm_key name
-    uniq = Time.new.to_f * 1000
-
-    response = @request.mkcol('/bitmarks/' + uuid, :if_none_match => '*')
-    new_coll '/bitmarks/' + uuid + '/' + uniq.to_s
-    response = @request.proppatch('/bitmarks/' + uuid + '/' + uniq.to_s, { tagp_key => value })
-    assert_equal '207', response.status
-    assert_equal '200', response[tagp_key].status
-  end
-
-  def get_uuid bit
-    response = @request.propfind(bit, 0, :"resource-id")
-    assert_equal '207', response.status
-    value = RubyDav.find_first_text response[:"resource-id"].element, "D:href"
-    return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
-  end
-
   def assert_num_search_results exp, response
     assert_equal exp, response.resources.length
   end
@@ -629,7 +610,4 @@ END_OF_WHERE
     URI.parse(@host).path
   end
 
-  def bm_key name
-    RubyDav::PropKey.get('http://limebits.com/ns/1.0/', name )
-  end
 end
