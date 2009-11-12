@@ -436,25 +436,55 @@ END_OF_WHERE
     delete_file 'test_search'
   end
 
-  def test_lb_bitmarks_search
+  def test_search_lb_bitmarks
     new_coll 'bits'
     new_coll 'bits/bit1'
     new_coll 'bits/bit2'
+    new_coll 'bits/bit3'
+    new_coll 'bits/bit4'
     new_file 'bits/nonbit1'
     new_file 'nonbit2'
 
     mark 'bits/bit1', 'name', 'Bit 1'
     mark 'bits/bit2', 'name', 'Bit 2'
     mark 'bits/bit1', 'tag', 'yellow'
+    mark 'bits/bit3', 'tag', 'green'
+    mark 'bits/bit3', 'tag', 'clean'
+    mark 'nonbit2', 'name', 'Non Bit 2'
+   
+    # depth-0, non-bit 
+    response = @request.search('nonbit2', { homepath + 'nonbit2' => 0 }, _not(is_collection), 
+                            :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 1, response
+
+    # depth-0, is-bit
+    response = @request.search('bits/bit1', { homepath + 'bits/bit1' => 0 }, is_bit, 
+                            :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 1, response
 
     where = is_bit
     scope = { homepath => :infinity }
+
+    # depth-infinity, is-bit
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag", "name"])
     assert_equal '207', response.status
-    assert_num_search_results 2, response
+    assert_num_search_results 4, response
 
-    # TODO: test the actual bitmarks returned
+    # is-bit & tag='green'
+    response = @request.search('', scope, _and(is_bit, eq(:tag, 'green', true)), 
+                            :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 1, response
+    
+    response = @request.search('', scope, where, 
+                            :getlastmodified, :bitmarks => ["tag"])
+    assert_equal '207', response.status
+    assert_num_search_results 4, response
+
+   # TODO: test the actual bitmarks returned
 
   ensure
     delete_coll 'bits'
@@ -509,30 +539,67 @@ END_OF_WHERE
     delete_coll 'bits'
   end
 
+  def test_property_stats_report
+    setup_bits
+
+    # use current time as a unique value for tags
+    tag1 = Time.now.to_f
+    tag2 = tag1 + 1
+
+    mark 'bits/bit1', 'tag', tag1
+    mark 'bits/bit2', 'tag', tag1
+    mark 'bits/bit2', 'tag', tag2
+
+    stream = RubyDav.build_xml_stream do |xml|
+      xml.LB(:"property-stats", "xmlns:LB" => "http://limebits.com/ns/1.0/") do
+        xml.LB(:prop) do
+          xml.LB(:tag)
+        end
+        xml.LB(:"sample-set") do
+          xml.LB(:value, tag1.to_s)
+          xml.LB(:value, tag2.to_s)
+          xml.LB(:value, 'fake')
+        end
+        xml.LB(:stat) do
+          xml.LB(:count)
+        end
+      end
+    end
+
+    response = @request.report('', stream)
+    assert_equal '200', response.status
+    assert_xml_matches response.body do |xml|
+      xml.xmlns! :LB => 'http://limebits.com/ns/1.0/'
+      xml.LB(:"property-stats") do
+        xml.LB(:prop) do
+          xml.LB(:tag)
+        end
+        xml.LB(:"sample-set") do
+          xml.LB(:stat) do
+            xml.LB(:value, tag1.to_s)
+            xml.LB(:count, "2")
+          end
+          xml.LB(:stat) do
+            xml.LB(:value, tag2.to_s)
+            xml.LB(:count, "1")
+          end
+          xml.LB(:stat) do
+            xml.LB(:value, 'fake')
+            xml.LB(:count, "0")
+          end
+        end
+      end
+    end
+
+    ensure
+    delete_coll 'bits'
+  end
+
   def setup_bits
     new_coll 'bits'
     new_coll 'bits/bit1'
     new_coll 'bits/bit2'
     new_file 'bits/bit1/index.html'
-  end
-
-  def mark bit, name, value
-    uuid = get_uuid bit
-    tagp_key = bm_key name
-    uniq = Time.new.to_f * 1000
-
-    response = @request.mkcol('/bitmarks/' + uuid, :if_none_match => '*')
-    new_coll '/bitmarks/' + uuid + '/' + uniq.to_s
-    response = @request.proppatch('/bitmarks/' + uuid + '/' + uniq.to_s, { tagp_key => value })
-    assert_equal '207', response.status
-    assert_equal '200', response[tagp_key].status
-  end
-
-  def get_uuid bit
-    response = @request.propfind(bit, 0, :"resource-id")
-    assert_equal '207', response.status
-    value = RubyDav.find_first_text response[:"resource-id"].element, "D:href"
-    return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
   end
 
   def assert_num_search_results exp, response
@@ -543,7 +610,4 @@ END_OF_WHERE
     URI.parse(@host).path
   end
 
-  def bm_key name
-    RubyDav::PropKey.get('http://limebits.com/ns/1.0/', name )
-  end
 end

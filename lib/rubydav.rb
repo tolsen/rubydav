@@ -773,6 +773,10 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :report_version_tree, url, stream, options
       end
 
+      def report(url, stream)
+        request :report, url, stream, {}
+      end
+
       def expand_property_report(url, eprops, options={})
         stream = RubyDav.build_xml_stream do |xml|
           xml.D(:"expand-property", "xmlns:D" => "DAV:") do
@@ -804,7 +808,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                   end
                   if !bitmarks.nil?
                     xml.LB(:bitmark, 
-                           "xmlns:LB" => "http://limebits.com/ns/1.0") do
+                           "xmlns:LB" => "http://limebits.com/ns/1.0/") do
                         bitmarks.each do |bitmark|
                             xml.LB(bitmark.to_sym)
                         end
@@ -839,7 +843,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
               end
 
               if offset
-                xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0") 
+                xml.limebits(:offset, offset.to_s, "xmlns:limebits" => "http://limebits.com/ns/1.0/") 
               end
             end
           end
