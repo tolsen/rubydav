@@ -810,7 +810,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                     xml.LB(:bitmark, 
                            "xmlns:LB" => "http://limebits.com/ns/1.0/") do
                         bitmarks.each do |bitmark|
-                            xml.LB(bitmark.to_sym)
+                            xml.BM(bitmark.to_sym, "xmlns:BM" => "http://limebits.com/ns/bitmarks/1.0/")
                         end
                     end
                   end
