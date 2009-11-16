@@ -161,7 +161,7 @@ module WebDavTestUtils
   end
 
   def bm_key name
-    RubyDav::PropKey.get('http://limebits.com/ns/1.0/', name )
+    RubyDav::PropKey.get('http://limebits.com/ns/bitmarks/1.0/', name )
   end
 
   def mark bit, name, value, creds={}
