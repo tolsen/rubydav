@@ -239,7 +239,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     
     response = @request.propfind('testfile', 0, :displayname)
     assert_equal '207', response.status
-    assert_equal '', response[:displayname].inner_value
+    assert_equal 'testfile', response[:displayname].inner_value
   ensure
     delete_file 'testfile'
   end
