@@ -554,7 +554,7 @@ END_OF_WHERE
     stream = RubyDav.build_xml_stream do |xml|
       xml.LB(:"property-stats", "xmlns:LB" => "http://limebits.com/ns/1.0/") do
         xml.LB(:prop) do
-          xml.LB(:tag)
+          xml.BM(:tag, "xmlns:BM" => "http://limebits.com/ns/bitmarks/1.0/")
         end
         xml.LB(:"sample-set") do
           xml.LB(:value, tag1.to_s)
@@ -571,9 +571,10 @@ END_OF_WHERE
     assert_equal '200', response.status
     assert_xml_matches response.body do |xml|
       xml.xmlns! :LB => 'http://limebits.com/ns/1.0/'
+      xml.xmlns! :BM => 'http://limebits.com/ns/bitmarks/1.0/'
       xml.LB(:"property-stats") do
         xml.LB(:prop) do
-          xml.LB(:tag)
+          xml.BM(:tag)
         end
         xml.LB(:"sample-set") do
           xml.LB(:stat) do

@@ -20,7 +20,7 @@ module SearchHelper
                 xml.D(:prop) { strict_propkey.printXML xml }
               else
                 xml.LB(:bitmark, "xmlns:LB" => "http://limebits.com/ns/1.0/") do
-                  xml.LB(propkey)
+                  xml.BM(propkey, "xmlns:BM" => "http://limebits.com/ns/bitmarks/1.0/")
                 end
               end
               xml.D(:literal, literal.to_s)
