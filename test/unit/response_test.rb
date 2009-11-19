@@ -29,6 +29,29 @@ class ResponseTest < Test::Unit::TestCase
     @response = RubyDav::Response.new(@url, @status, headers)
     assert_equal headers["date"][0], @response.date
   end
+
+  def test_etag
+    headers = {'etag' => ['fake_etag']}
+    response = RubyDav::Response.new(@url, @status, headers)
+    assert_equal 'fake_etag', response.etag
+  end
+  
+  def test_etag__empty
+    headers = {'etag' => []}
+    response = RubyDav::Response.new(@url, @status, headers)
+    assert_nil response.etag
+  end
+  
+  def test_etag__multiple_etags
+    headers = {'etag' => ['fake_etag1', 'fake_etag2']}
+    response = RubyDav::Response.new(@url, @status, headers)
+    assert_equal 'fake_etag1', response.etag
+  end
+  
+  def test_etag__no_etag
+    response = RubyDav::Response.new(@url, @status, {})
+    assert_nil response.etag
+  end
   
   def test_initialize
     response = RubyDav::Response.new(@url, @status, @headers)

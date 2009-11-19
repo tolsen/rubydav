@@ -1,4 +1,5 @@
 require 'set'
+require 'uri'
 
 require File.dirname(__FILE__) + '/prop_key'
 require File.dirname(__FILE__) + '/property_result'
@@ -57,7 +58,7 @@ module RubyDav
       
     def printXML(xml = nil)
       return RubyDav::buildXML(xml) do |xml, ns|
-        xml.D :ace, *ns do
+        xml.D :ace, ns do
           xml.D :principal do
             if Symbol === @principal
               xml.D @principal
@@ -92,6 +93,14 @@ module RubyDav
       'Action: ' + @action.to_s + ' Principal: ' + @principal.to_s +
       ' Protected: ' + (@isprotected ? 'T':'F') + ' Privileges: ' +
       @privileges.inject(' ') {|privs, p| privs += p.to_s}
+    end
+
+    # removes hostname from the principal
+    @@generalize_principal_rx =
+      /^#{URI::REGEXP::PATTERN::SCHEME}:\/\/#{URI::REGEXP::PATTERN::AUTHORITY}/
+    def generalize_principal!
+      @principal.sub!(@@generalize_principal_rx, '') if @principal.is_a? String
+      return self
     end
 
     class << self
@@ -211,6 +220,11 @@ module RubyDav
       end
       
       super
+    end
+
+    def generalize_principals!
+      each { |p| p.generalize_principal! }
+      return self
     end
     
     def printXML(xml)

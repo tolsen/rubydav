@@ -33,6 +33,12 @@ module RubyDav
       end
     end
     
+    def etag
+      etag_hdrs = headers['etag']
+      return nil if etag_hdrs.nil? || etag_hdrs.empty?
+      return etag_hdrs.first
+    end
+
     def self.create(url, status, headers, body, method)
       self.new(url,status,headers)
     end
@@ -78,9 +84,6 @@ module RubyDav
   class SuccessfulResponse < Response
     def error?
       false
-    end
-
-    def etag
     end
   end
 
@@ -424,9 +427,6 @@ module RubyDav
 
   # redirect response class, status 304
   class NotModifiedResponse < RedirectionResponse #:nodoc
-    # resource's entity-tag
-    def etag
-    end
   end
 
   # For multistatus responses that return individual DAV:response elements with
