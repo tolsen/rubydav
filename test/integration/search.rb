@@ -447,7 +447,8 @@ END_OF_WHERE
 
     mark 'bits/bit1', 'name', 'Bit 1'
     mark 'bits/bit2', 'name', 'Bit 2'
-    mark 'bits/bit1', 'tag', 'yellow'
+    mark 'bits/bit3', 'name', 'Bit 3'
+    mark 'bits/bit1', 'tag', 'green'
     mark 'bits/bit3', 'tag', 'green'
     mark 'bits/bit3', 'tag', 'clean'
     mark 'nonbit2', 'name', 'Non Bit 2'
@@ -473,11 +474,11 @@ END_OF_WHERE
     assert_equal '207', response.status
     assert_num_search_results 4, response
 
-    # is-bit & tag='green'
+    # is-bit & tag='green' & limit
     response = @request.search('', scope, _and(is_bit, eq(:tag, 'green', true)), 
-                            :getlastmodified, :bitmarks => ["tag", "name"])
+                            :getlastmodified, :bitmarks => ["tag", "name"], :limit => 2)
     assert_equal '207', response.status
-    assert_num_search_results 1, response
+    assert_num_search_results 2, response
     
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag"])
