@@ -519,6 +519,7 @@ END_OF_WHERE
 
     # GET bit1, should increate it's popularity
     @request.get('bits/bit1/index.html')
+    sleep 1
 
     response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
 
@@ -529,7 +530,9 @@ END_OF_WHERE
 
     # GET bit2 twice, making it more popular than bit1
     @request.get('bits/bit2/index.html')
+    sleep 1
     @request.get('bits/bit2/index.html')
+    sleep 1
 
     response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
 
