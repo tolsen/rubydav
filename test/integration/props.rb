@@ -371,6 +371,9 @@ class WebDavPropsTest < Test::Unit::TestCase
     delete_coll 'd'
 
     # add a property to the source
+    response = @request.proppatch('a', {:displayname => 'My name'})
+    assert response[:displayname]
+    
     response = @request.proppatch('a/b/c', {:displayname => 'myname'})
     assert response[:displayname]
 
@@ -379,6 +382,9 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_equal '201', response.status
 
     # check that displayname is correct on the destination
+    response = @request.propfind('d', 0, :allprop)
+    assert_equal 'My name', response[:displayname].inner_value
+
     response = @request.propfind('d/b/c', 0, :allprop)
     assert_equal 'myname', response[:displayname].inner_value
 
