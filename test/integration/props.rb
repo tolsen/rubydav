@@ -192,9 +192,12 @@ class WebDavPropsTest < Test::Unit::TestCase
     end
   end
 
+  def glm_pkey
+    RubyDav::PropKey.get("DAV:", "getlastmodified")
+  end
+    
   def test_getlastmodified
     new_file 'testfile', StringIO.new("test")
-    glm_pkey = RubyDav::PropKey.get("DAV:", "getlastmodified")
 
     response = @request.propfind('testfile', 0, :getlastmodified)
     assert_equal '207', response.status
@@ -211,6 +214,31 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_not_equal getlastmodified1, getlastmodified2
   ensure
     delete_file 'testfile'
+  end
+
+  def test_getlastmodified_depth_infinity
+    new_coll 'glm_inf'
+    new_file 'glm_inf/testfile', StringIO.new("test")
+
+    response = @request.propfind('glm_inf', RubyDav::INFINITY, :getlastmodified)
+    assert_equal '207', response.status
+    testfile_response = response[homepath + 'glm_inf/testfile']
+    assert_not_nil testfile_response
+    getlastmodified1 = testfile_response[glm_pkey].inner_value
+
+    sleep 3
+    response = @request.put('glm_inf/testfile', @stream)
+    assert_equal '204', response.status
+
+    response = @request.propfind('glm_inf', RubyDav::INFINITY, :getlastmodified)
+    assert_equal '207', response.status
+    testfile_response = response[homepath + 'glm_inf/testfile']
+    assert_not_nil testfile_response
+    getlastmodified2 = testfile_response[glm_pkey].inner_value
+
+    assert_not_equal getlastmodified1, getlastmodified2
+  ensure
+    delete_coll 'glm_inf'
   end
 
   def test_creationdate

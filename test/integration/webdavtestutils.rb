@@ -176,4 +176,8 @@ module WebDavTestUtils
     assert_equal '200', response[tagp_key].status
   end
 
+  def homepath
+    URI.parse(@host).path
+  end
+
 end

@@ -633,9 +633,4 @@ END_OF_WHERE
   def assert_num_search_results exp, response
     assert_equal exp, response.resources.length
   end
-
-  def homepath
-    URI.parse(@host).path
-  end
-
 end
