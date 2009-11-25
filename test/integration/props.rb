@@ -2,6 +2,7 @@ require 'test/unit'
 require 'lib/rubydav'
 require 'test/integration/webdavtestsetup'
 require 'test/unit/xml'
+require 'time'
 
 class WebDavPropsTest < Test::Unit::TestCase
   include WebDavTestSetup
@@ -201,7 +202,7 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.propfind('testfile', 0, :getlastmodified)
     assert_equal '207', response.status
-    getlastmodified1 = response[glm_pkey].inner_value
+    getlastmodified1 = Time.httpdate(response[glm_pkey].inner_value)
 
     sleep 3
     response = @request.put('testfile', @stream)
@@ -209,9 +210,9 @@ class WebDavPropsTest < Test::Unit::TestCase
 
     response = @request.propfind('testfile', 0, :getlastmodified)
     assert_equal '207', response.status
-    getlastmodified2 = response[glm_pkey].inner_value
+    getlastmodified2 = Time.httpdate(response[glm_pkey].inner_value)
 
-    assert_not_equal getlastmodified1, getlastmodified2
+    assert getlastmodified1 < getlastmodified2
   ensure
     delete_file 'testfile'
   end
@@ -224,7 +225,7 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_equal '207', response.status
     testfile_response = response[homepath + 'glm_inf/testfile']
     assert_not_nil testfile_response
-    getlastmodified1 = testfile_response[glm_pkey].inner_value
+    getlastmodified1 = Time.httpdate(testfile_response[glm_pkey].inner_value)
 
     sleep 3
     response = @request.put('glm_inf/testfile', @stream)
@@ -234,11 +235,51 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_equal '207', response.status
     testfile_response = response[homepath + 'glm_inf/testfile']
     assert_not_nil testfile_response
-    getlastmodified2 = testfile_response[glm_pkey].inner_value
+    getlastmodified2 = Time.httpdate(testfile_response[glm_pkey].inner_value)
 
-    assert_not_equal getlastmodified1, getlastmodified2
+    assert getlastmodified1 < getlastmodified2
   ensure
     delete_coll 'glm_inf'
+  end
+
+  def test_getlastmodified_move
+    new_coll 'glm_move_src'
+    new_coll 'glm_move_dst'
+    new_file 'glm_move_src/testfile', StringIO.new("test src")
+    
+    sleep 3
+    new_file 'glm_move_dst/testfile', StringIO.new("test dst")
+
+    # getlastmodifed for destination
+    response = @request.propfind('glm_move_dst', RubyDav::INFINITY, :getlastmodified)
+    assert_equal '207', response.status
+    testfile_response = response[homepath + 'glm_move_dst/testfile']
+    assert_not_nil testfile_response
+    testfile_glm1 = Time.httpdate(testfile_response[glm_pkey].inner_value)
+    dst_response = response[homepath + 'glm_move_dst']
+    assert_not_nil dst_response
+    dst_glm1 = Time.httpdate(dst_response[glm_pkey].inner_value)
+
+    # move src to dst
+    response = @request.move('glm_move_src', 'glm_move_dst', true)
+    assert_equal '204', response.status
+
+    # now request getlastmodified for destination
+    response = @request.propfind('glm_move_dst', RubyDav::INFINITY, :getlastmodified)
+    assert_equal '207', response.status
+    testfile_response = response[homepath + 'glm_move_dst/testfile']
+    assert_not_nil testfile_response
+    testfile_glm2 = Time.httpdate(testfile_response[glm_pkey].inner_value)
+    dst_response = response[homepath + 'glm_move_dst']
+    assert_not_nil dst_response
+    dst_glm2 = Time.httpdate(dst_response[glm_pkey].inner_value)
+
+    assert dst_glm2 >= dst_glm1
+    assert testfile_glm2 >= testfile_glm1
+
+    ensure
+    delete_coll 'glm_move_src'
+    delete_coll 'glm_move_dst'
   end
 
   def test_creationdate
