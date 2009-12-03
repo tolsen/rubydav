@@ -238,6 +238,27 @@ class WebDavSearchTest < Test::Unit::TestCase
     delete_file file3
   end
 
+  def test_search_special_characters
+    file1 = 'file1'
+
+    new_file file1, StringIO.new("file1")
+
+    response = @request.proppatch(file1, { :displayname => 'Rock & Roll' })
+    assert_equal '207', response.status
+
+    where = _not(is_collection)
+    scope = { homepath => :infinity }
+    response = @request.search('', scope, where, :displayname)
+
+    assert_num_search_results 1, response
+
+    # make sure we got file1
+    assert_not_nil response[homepath + 'file1']
+
+    # cleanup
+    delete_file file1
+  end
+
   def test_search_multiple_scope
     file1 = 'file1'
     file2 = 'file2'
