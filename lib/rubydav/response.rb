@@ -603,9 +603,16 @@ module RubyDav
         @@map[status].default = classname
       end
     end
+
+    class << self
     
-    def self.get(url, status, headers, body, method)
-      @@map[status][method].create(url, status, headers, body, method)
+      def get(url, status, headers, body, method)
+        map[status][method].create(url, status, headers, body, method)
+      end
+
+      def map() @@map; end
+      
     end
+    
   end
 end

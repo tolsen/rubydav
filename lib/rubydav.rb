@@ -922,7 +922,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       def try_request httpmethod, uri, stream, auth, options
         requesturl = uri.path
         requesturl = requesturl + "?" + uri.query unless uri.query.nil?
-        request = RubyDav::getrequestclass(httpmethod).new requesturl
+        request = RubyDav::get_request_class(httpmethod).new requesturl
 
         (%w(destination if_match if_none_match if_modified_since) +
          %w(if_unmodified_since)).each do |k|

@@ -13,7 +13,8 @@ LibXML::XML.default_warnings = false
 module RubyDav
 
   module Utility
-    def getrequestclass(httpmethod)
+    
+    def get_request_class(httpmethod)
       method = case httpmethod.to_s
                when /^propfind/ : :propfind
                when /^report/ : :report

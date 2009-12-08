@@ -168,5 +168,16 @@ EOS
   def body_root_element body
     return LibXML::XML::Document.string(body).root
   end
+
+  def validate_propfind(request,depth,body, url_path = @url_path)
+    (request.is_a?(Net::HTTP::Propfind)) &&
+      (request.path == url_path) &&
+      (request['depth'].downcase == depth.to_s.downcase) &&
+      (xml_equal?(body, request.body_stream.read))
+  end
+
+  def bmark name, value, owner, url = nil
+    RubyDav::Bitmark.new name, value, owner, url
+  end
   
 end

@@ -7,6 +7,8 @@ require 'rubygems'
 gem 'builder'
 
 require File.dirname(__FILE__) + '/rubydav.rb'
+require File.dirname(__FILE__) + '/limestone/bitmark.rb'
+require File.dirname(__FILE__) + '/limestone/response.rb'
 
 module RubyDav
 
@@ -46,6 +48,14 @@ module RubyDav
       return put_user(url, options.merge(:if_match => '*'))
     end
 
+    def propfind_bitmarks uuid, options = {}
+      uuid = uuid.gsub /-/, ''
+      url = Bitmark::BITMARKS_ROOT + "/#{uuid}"
+
+      bodystream = generate_propfind_bodystream :allprop, :owner
+      return request(:propfind_bitmarks, url, bodystream, :depth => 1)
+    end
+      
     clone_class_from_instance_methods(
                                       :put_user,
                                       :create_user,

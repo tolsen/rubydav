@@ -147,13 +147,4 @@ EOS
   
   create_request_validation_tests RubyDav::INFINITY,0,1
     
-  
-  def validate_propfind(request,depth,body)
-    (request.is_a?(Net::HTTP::Propfind)) &&
-      (request.path == @url_path) &&
-      (request['depth'].downcase == depth.to_s.downcase) &&
-      (xml_equal?(body, request.body_stream.read))
-  end
-  
-
 end
