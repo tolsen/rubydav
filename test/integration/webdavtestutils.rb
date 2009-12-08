@@ -161,7 +161,7 @@ module WebDavTestUtils
   end
 
   def bm_key name
-    RubyDav::PropKey.get('http://limebits.com/ns/1.0/', name )
+    RubyDav::PropKey.get('http://limebits.com/ns/bitmarks/1.0/', name )
   end
 
   def mark bit, name, value, creds={}
@@ -174,6 +174,10 @@ module WebDavTestUtils
     response = @request.proppatch('/bitmarks/' + uuid + '/' + uniq.to_s, { tagp_key => value }, creds)
     assert_equal '207', response.status
     assert_equal '200', response[tagp_key].status
+  end
+
+  def homepath
+    URI.parse(@host).path
   end
 
 end

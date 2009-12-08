@@ -238,6 +238,27 @@ class WebDavSearchTest < Test::Unit::TestCase
     delete_file file3
   end
 
+  def test_search_special_characters
+    file1 = 'file1'
+
+    new_file file1, StringIO.new("file1")
+
+    response = @request.proppatch(file1, { :displayname => 'Rock & Roll' })
+    assert_equal '207', response.status
+
+    where = _not(is_collection)
+    scope = { homepath => :infinity }
+    response = @request.search('', scope, where, :displayname)
+
+    assert_num_search_results 1, response
+
+    # make sure we got file1
+    assert_not_nil response[homepath + 'file1']
+
+    # cleanup
+    delete_file file1
+  end
+
   def test_search_multiple_scope
     file1 = 'file1'
     file2 = 'file2'
@@ -447,7 +468,8 @@ END_OF_WHERE
 
     mark 'bits/bit1', 'name', 'Bit 1'
     mark 'bits/bit2', 'name', 'Bit 2'
-    mark 'bits/bit1', 'tag', 'yellow'
+    mark 'bits/bit3', 'name', 'Bit 3'
+    mark 'bits/bit1', 'tag', 'green'
     mark 'bits/bit3', 'tag', 'green'
     mark 'bits/bit3', 'tag', 'clean'
     mark 'nonbit2', 'name', 'Non Bit 2'
@@ -473,11 +495,11 @@ END_OF_WHERE
     assert_equal '207', response.status
     assert_num_search_results 4, response
 
-    # is-bit & tag='green'
+    # is-bit & tag='green' & limit
     response = @request.search('', scope, _and(is_bit, eq(:tag, 'green', true)), 
-                            :getlastmodified, :bitmarks => ["tag", "name"])
+                            :getlastmodified, :bitmarks => ["tag", "name"], :limit => 2)
     assert_equal '207', response.status
-    assert_num_search_results 1, response
+    assert_num_search_results 2, response
     
     response = @request.search('', scope, where, 
                             :getlastmodified, :bitmarks => ["tag"])
@@ -518,6 +540,7 @@ END_OF_WHERE
 
     # GET bit1, should increate it's popularity
     @request.get('bits/bit1/index.html')
+    sleep 1
 
     response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
 
@@ -528,7 +551,9 @@ END_OF_WHERE
 
     # GET bit2 twice, making it more popular than bit1
     @request.get('bits/bit2/index.html')
+    sleep 1
     @request.get('bits/bit2/index.html')
+    sleep 1
 
     response = @request.search('', { homepath => :infinity }, is_bit, :allprop, :orderby => [[:popularity, :descending]], :limit => 1)
 
@@ -553,7 +578,7 @@ END_OF_WHERE
     stream = RubyDav.build_xml_stream do |xml|
       xml.LB(:"property-stats", "xmlns:LB" => "http://limebits.com/ns/1.0/") do
         xml.LB(:prop) do
-          xml.LB(:tag)
+          xml.BM(:tag, "xmlns:BM" => "http://limebits.com/ns/bitmarks/1.0/")
         end
         xml.LB(:"sample-set") do
           xml.LB(:value, tag1.to_s)
@@ -570,9 +595,10 @@ END_OF_WHERE
     assert_equal '200', response.status
     assert_xml_matches response.body do |xml|
       xml.xmlns! :LB => 'http://limebits.com/ns/1.0/'
+      xml.xmlns! :BM => 'http://limebits.com/ns/bitmarks/1.0/'
       xml.LB(:"property-stats") do
         xml.LB(:prop) do
-          xml.LB(:tag)
+          xml.BM(:tag)
         end
         xml.LB(:"sample-set") do
           xml.LB(:stat) do
@@ -595,6 +621,29 @@ END_OF_WHERE
     delete_coll 'bits'
   end
 
+  def test_copy_copies_bitmarks
+    new_coll 'src'
+    new_coll 'src/subcoll'
+    new_file 'src/file', StringIO.new("file1")
+    new_file 'src/subcoll/file', StringIO.new("file2")
+
+    mark 'src', 'name', 'Source'
+    mark 'src/subcoll', 'name', 'Sub Collection'
+    mark 'src/subcoll', 'tag', 'foo'
+    mark 'src/subcoll', 'tag', 'bar'
+
+    response = @request.copy('src', 'dst', RubyDav::INFINITY, true)
+    assert_equal '201', response.status
+
+    response = @request.search('dst', { homepath + 'dst' => :infinity }, is_collection, :getlastmodified, :bitmarks => ["tag", "name"])
+    assert_equal '207', response.status
+    assert_num_search_results 2, response
+
+    ensure
+    delete_coll 'src'
+    delete_coll 'dst'
+  end
+
   def setup_bits
     new_coll 'bits'
     new_coll 'bits/bit1'
@@ -605,9 +654,4 @@ END_OF_WHERE
   def assert_num_search_results exp, response
     assert_equal exp, response.resources.length
   end
-
-  def homepath
-    URI.parse(@host).path
-  end
-
 end
