@@ -14,6 +14,10 @@ module RubyDav
       # The url is of the form /bitmarks/<uuid>/col
       attr_reader :url
 
+      def hash
+        return "#{@name.hash}/#{@value.hash}/#{@owner.hash}".hash
+      end
+
       def initialize name, value, owner, url = nil
         @name = name
         @value = value
@@ -33,17 +37,11 @@ module RubyDav
             attr_value == other_attr_value
         end
 
-        return url <=> other.url unless url.nil? || other.url.nil?
-
-        # nil urls sort before non-nil urls
-        if url.nil?
-          return other.url.nil? ? 0 : -1
-        else
-          # other.url must be nil        
-          raise "Internal Error" unless other.url.nil?
-          return 1  
-        end
+        return 0
       end
+
+      alias_method :eql?, :==
+      
     end
   end
 
