@@ -53,7 +53,8 @@ module RubyDav
       url = Bitmark::BITMARKS_ROOT + "/#{uuid}"
 
       bodystream = generate_propfind_bodystream :allprop, :owner
-      return request(:propfind_bitmarks, url, bodystream, :depth => 1)
+      opts = options.merge :depth => 1
+      return request(:propfind_bitmarks, url, bodystream, opts)
     end
       
     clone_class_from_instance_methods(
