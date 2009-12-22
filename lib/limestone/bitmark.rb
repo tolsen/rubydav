@@ -18,6 +18,11 @@ module RubyDav
         return "#{@name.hash}/#{@value.hash}/#{@owner.hash}".hash
       end
 
+      def generalize_owner!
+        @owner = RubyDav.generalize_principal @owner
+        return self
+      end
+
       def initialize name, value, owner, url = nil
         @name = name
         @value = value

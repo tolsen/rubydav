@@ -96,6 +96,14 @@ module RubyDav
       return text_node.nil? ? nil : text_node.to_s
     end
 
+    @@generalize_principal_rx =
+      /^#{URI::REGEXP::PATTERN::SCHEME}:\/\/#{URI::REGEXP::PATTERN::AUTHORITY}/
+
+    # removes hostname from principal
+    def generalize_principal principal
+      return principal.sub(@@generalize_principal_rx, '')
+    end
+
     # creates a copy of each child before doing to_s
     # so that namespaces are properly declared
     def inner_xml_copy node, options = {}

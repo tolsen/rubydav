@@ -265,12 +265,6 @@ EOS
     assert_equal '/users/bits', ace.principal
   end
 
-  def test_generalize_principal__already_general
-    ace = create_ace :grant, '/users/bits', false, :'write-properties'
-    assert_same ace, ace.generalize_principal!
-    assert_equal '/users/bits', ace.principal
-  end
-
   def test_generalize_principal__property
     ace = create_ace :grant, @owner_pk, true, :all
     assert_same ace, ace.generalize_principal!

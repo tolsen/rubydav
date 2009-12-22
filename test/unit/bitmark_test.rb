@@ -38,6 +38,12 @@ class BitmarkTest < RubyDavUnitTestCase
     assert_equal(0, bmark('a', 'b', 'c', 'd') <=> bmark('a', 'b', 'c'))
   end
 
+  def test_generalize_owner
+    bm = bmark('tag', 'blue', 'http://example.com/users/tim')
+    bm.generalize_owner!
+    assert_equal '/users/tim', bm.owner
+  end
+
   def test_hash
     assert_equal @bm1.hash, @bm2.hash
   end

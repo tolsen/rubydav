@@ -96,10 +96,9 @@ module RubyDav
     end
 
     # removes hostname from the principal
-    @@generalize_principal_rx =
-      /^#{URI::REGEXP::PATTERN::SCHEME}:\/\/#{URI::REGEXP::PATTERN::AUTHORITY}/
     def generalize_principal!
-      @principal.sub!(@@generalize_principal_rx, '') if @principal.is_a? String
+      @principal = RubyDav.generalize_principal @principal if
+        @principal.is_a? String
       return self
     end
 
