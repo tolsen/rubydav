@@ -152,35 +152,39 @@ module RubyDav
         root = XML::Document.string(body).root
 
         raise BadResponseError unless node_has_name? root, 'multistatus'
+        description = nil
 
-        description = find_first_text root, 'D:responsedescription'
-        
-        find(root, "D:response") do |response_elements|
+        ensure_garbage_collection true do 
+
+          description = find_first_text root, 'D:responsedescription'
           
-          raise BadResponseError if response_elements.empty?
-
-          response_elements.each do |response_element|
-            sub_status_str = find_first_text response_element, "D:status"
-            sub_status = parse_status sub_status_str
-            error_elem = find_first response_element, 'D:error'
-            error = DavError.parse error_elem
-            sub_description = find_first_text response_element, 'D:responsedescription'
-            location = find_first_text response_element, 'D:location'
+          find(root, "D:response") do |response_elements|
             
-            find(response_element, "D:href/text()") do |hrefs|
-              hrefs.each do |href|
-                raise BadResponseError if responses.include? href
-                responses[href.to_s] =
-                  SubResponse.new href.to_s, sub_status, error, sub_description, location
+            raise BadResponseError if response_elements.empty?
+
+            response_elements.each do |response_element|
+              sub_status_str = find_first_text response_element, "D:status"
+              sub_status = parse_status sub_status_str
+              error_elem = find_first response_element, 'D:error'
+              error = DavError.parse error_elem
+              sub_description = find_first_text response_element, 'D:responsedescription'
+              location = find_first_text response_element, 'D:location'
+              
+              find(response_element, "D:href/text()") do |hrefs|
+                hrefs.each do |href|
+                  raise BadResponseError if responses.include? href
+                  responses[href.to_s] =
+                    SubResponse.new href.to_s, sub_status, error, sub_description, location
+                end
               end
             end
           end
         end
+        
         return MultiStatusResponse.new(url, status, headers, body,
                                        responses, method, description)
       end
 
-      RubyDav.gc_protect self, :create
     end
 
     private
@@ -233,14 +237,18 @@ module RubyDav
 
       def parse_body(body)
         root = XML::Document.string(body).root
-        ld_elem = find_first root, '/D:prop/D:lockdiscovery'
-        raise BadResponseError if ld_elem.nil?
-        return RubyDav::LockDiscovery.from_elem(ld_elem)
+        ld = nil
+        
+        ensure_garbage_collection true do 
+          ld_elem = find_first root, '/D:prop/D:lockdiscovery'
+          raise BadResponseError if ld_elem.nil?
+          ld = RubyDav::LockDiscovery.from_elem(ld_elem)
+        end
+        
+        return ld
       rescue ArgumentError
         raise BadResponseError
       end
-
-      RubyDav.gc_protect self, :parse_body
 
     end
     
@@ -531,7 +539,7 @@ module RubyDav
         raise BadResponseError
       end
 
-      RubyDav.gc_protect self, :parse_body, :parse_propstats
+      RubyDav.gc_protect self, :parse_propstats
 
     end
     

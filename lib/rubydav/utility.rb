@@ -65,12 +65,17 @@ module RubyDav
     end
 
     @@gc_block_count = 0
-    def ensure_garbage_collection &block
+
+    # setting force to true will force the garbage collection to
+    # happen after leaving the block.  Otherwise garbage collection
+    # will not happen if we are already inside an ensure_garbage_collection
+    # call
+    def ensure_garbage_collection force = false, &block
       @@gc_block_count += 1
       yield
     ensure
       @@gc_block_count -= 1
-      GC.start if @@gc_block_count.zero?
+      GC.start if force || @@gc_block_count.zero?
     end
 
     # does find, but with D => DAV: added to nslist.
