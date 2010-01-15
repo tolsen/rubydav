@@ -156,7 +156,7 @@ module WebDavTestUtils
   def get_uuid bit
     response = @request.propfind(bit, 0, :"resource-id")
     assert_equal '207', response.status
-    value = RubyDav.first_element_named response[:"resource-id"].element, 'href'
+    value = RubyDav.first_element_named(response[:"resource-id"].element, 'href').content
     return value.to_s.gsub(/(.*:)/, '').gsub(/-/,'')
   end
 
