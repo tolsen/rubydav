@@ -55,26 +55,27 @@ module RubyDav
     class << self
       
       def from_elem elem
-        privilege_elem = RubyDav.find_first elem, 'D:privilege/*'
-        privilege =
-          RubyDav::PropKey.get(RubyDav.namespace_href(privilege_elem),
-                               privilege_elem.name)
-        abstract = !RubyDav.find_first(elem, 'D:abstract').nil?
-        description_elem = RubyDav.find_first elem, 'D:description'
-        description = RubyDav.find_first(description_elem, 'text()').to_s
-        language = description_elem.lang
+        children = RubyDav.dav_elements_hash(elem, 'privilege',
+                                             'abstract', 'description')
+        
+        privilege_child = RubyDav.first_element children['privilege']
+        privilege = RubyDav.element_to_propkey privilege_child
+
+        abstract = children.include? 'abstract'
+
+        description = children['description'].content
+        language = children['description'].lang
         children = map_from_elem_to_children elem
 
         return new(privilege, description, language, abstract, *children)
       end
 
       def map_from_elem_to_children elem
-        RubyDav.find(elem, 'D:supported-privilege') do |sprivilege_elems|
-          return(sprivilege_elems.map { |e| from_elem e })
+        return RubyDav.elements_named(elem, 'supported-privilege').map do |e|
+          from_elem e
         end
       end
 
-      RubyDav.gc_protect self, :from_elem
     end
 
   end

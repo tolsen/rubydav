@@ -14,9 +14,12 @@ module RubyDav
 
       def from_elem elem
         RubyDav.assert_elem_name elem, 'supportedlock'
-        RubyDav.find elem, 'D:lockentry' do |elems|
-          return new(*elems.map { |e| LockEntry.from_elem e })
+
+        entries = RubyDav.elements_named(elem, 'lockentry').map do |le|
+          LockEntry.from_elem le
         end
+
+        return new(*entries)
       end
     end
 
@@ -40,18 +43,17 @@ module RubyDav
       def from_elem elem
         RubyDav.assert_elem_name elem, 'lockentry'
 
-        type_child = RubyDav.find_first elem, 'D:locktype/*'
-        scope_child = RubyDav.find_first elem, 'D:lockscope/*'
-        raise ArgumentError if type_child.nil? || scope_child.nil?
-
-        type = type_child.name.to_sym
-        scope = scope_child.name.to_sym
+        args = ['locktype', 'lockscope'].map do |name|
+          child = RubyDav.first_element_named elem, name
+          raise ArgumentError if child.nil?
+          grandchild = RubyDav.first_element child
+          raise ArgumentError if grandchild.nil?
+          next grandchild.name.to_sym
+        end
         
-        return new(type, scope)
+        return new(*args)
       end
 
-      RubyDav.gc_protect self, :from_elem
-      
     end
   end
 end

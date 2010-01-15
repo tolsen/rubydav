@@ -105,30 +105,32 @@ module RubyDav
     class << self
 
       def from_elem elem
-        protected = !RubyDav.find_first(elem, 'D:protected').nil?
-        inherited_url =
-          RubyDav.find_first elem, 'D:inherited/D:href/text()'
+        nodes = RubyDav.dav_elements_hash(elem, 'protected', 'inherited',
+                                          'principal', 'grant', 'deny')
 
-        principal_elem = RubyDav.find_first elem, 'D:principal'
-        raise 'no principal element found' if principal_elem.nil?
-        principal = parse_principal_element principal_elem
+        protected = nodes.include? 'protected'
+          
+        raise 'no principal element found' unless nodes.include? 'principal'
+        principal = parse_principal_element nodes['principal']
 
-        action_elem = RubyDav.find_first elem, 'D:grant|D:deny'
-        raise 'no grant or deny element found' if action_elem.nil?
-        action = action_elem.name.to_sym
-
-        privileges = nil
-        RubyDav.find(action_elem, 'D:privilege/*') do |privilege_elements|
-          privileges = privilege_elements.map do |e|
-            PropKey.get RubyDav.namespace_href(e), e.name
-          end
+        action_elem = nodes['grant']
+        if nodes.include? 'deny'
+          raise 'cannot specify both grant and deny at the same time' unless
+            action_elem.nil?
+          action_elem = nodes['deny']
+        else
+          raise 'no grant or deny element found' if action_elem.nil?
         end
 
-        if inherited_url.nil?
-          return Ace.new(action, principal, protected, *privileges)
-        else
+        action = action_elem.name.to_sym
+        privileges = RubyDav.privilege_elements_to_propkeys action_elem
+        
+        if nodes.include? 'inherited'
+          inherited_url = RubyDav.first_element_named(nodes['inherited'], 'href').content
           return InheritedAce.new(inherited_url.to_s, action, principal,
                                   protected, *privileges)
+        else
+          return Ace.new(action, principal, protected, *privileges)
         end
       end
 
@@ -140,21 +142,23 @@ module RubyDav
       end
 
       def parse_principal_element principal_elem
-        if (href = RubyDav.find_first_text principal_elem, 'D:href')
-          return href
-        elsif (property = RubyDav.find_first principal_elem, 'D:property/*')
-          return PropKey.get(RubyDav.namespace_href(property), property.name)
-        else
-          %w(all authenticated unauthenticated self).each do |name|
-            property = RubyDav.find_first principal_elem, "D:#{name}"
-            return name.to_sym unless property.nil?
-          end
+        child = RubyDav.first_element principal_elem
+        raise "child of <principal> needs to be in the DAV: namespace" unless
+          RubyDav.namespace_href(child) == 'DAV:'
 
-          raise "invalid principal element: #{principal_elem.to_s}"
+        case child.name
+        when 'all', 'authenticated', 'unauthenticated', 'self'
+          return child.name.to_sym
+        when 'href'
+          return child.content
+        when 'property'
+          grandchild = RubyDav.first_element child
+          return RubyDav.element_to_propkey(grandchild)
+        else
+          raise "unrecognized child of principal element: #{principal_elem.to_s}"
         end
       end
 
-      RubyDav.gc_protect self, :from_elem, :parse_principal_element
     end
   end
   
@@ -253,10 +257,7 @@ module RubyDav
     class << self
       
       def from_elem elem
-        aces = nil
-        RubyDav.find(elem, 'D:ace') do |ace_elems|
-          aces = ace_elems.map { |e| Ace.from_elem e }
-        end
+        aces = RubyDav.elements_named(elem, 'ace').map { |e| Ace.from_elem e }
         return Acl[*aces]
       end
       

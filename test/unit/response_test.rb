@@ -296,9 +296,8 @@ class MkcolResponseTest < RubyDavUnitTestCase
 EOS
 
     root = body_root_element response_str
-    resourcetype_prop = RubyDav.find_first root, 'D:propstat/D:prop/D:resourcetype'
-    displayname_prop = RubyDav.find_first root, 'D:propstat/D:prop/D:displayname'
-    
+    resourcetype_prop = RubyDav.get_dav_descendent root, 'propstat', 'prop', 'resourcetype'
+    displayname_prop = RubyDav.get_dav_descendent root, 'propstat', 'prop', 'displayname'
 
     expected = {
       '/home/special' => {
@@ -345,7 +344,7 @@ end
 class PropstatResponseTest < RubyDavUnitTestCase
 
   def assert_property_result prop, pk, result, status = '200', error = nil
-    element = RubyDav.find_first prop, "ns:#{pk.name}", 'ns' => pk.ns
+    element = RubyDav.first_element_named prop, pk.name, pk.ns
     assert_equal pk, result.prop_key
     assert_equal status, result.status
     assert_equal error, result.error
@@ -353,13 +352,18 @@ class PropstatResponseTest < RubyDavUnitTestCase
   end
 
   def get_prop response, status = 'HTTP/1.1 200 OK'
-    RubyDav.find_first(response,
-                      "D:propstat/D:status[.='#{status}']/../D:prop")
+    RubyDav.each_element_named response, 'propstat' do |propstat_elem|
+      status_elem = RubyDav.first_element_named propstat_elem, 'status'
+      return RubyDav.first_element_named(propstat_elem, 'prop') if
+        status_elem.content == status
+    end
   end
 
   def get_response root, url
-      RubyDav.find_first(root,
-                         "/D:multistatus/D:response/D:href[.='#{url}']/..")
+    RubyDav.each_element_named root, 'response' do |response_elem|
+      return response_elem if
+        RubyDav.first_element_named(response_elem, 'href').content == url
+    end
   end
 
   def get_results props
@@ -372,7 +376,7 @@ class PropstatResponseTest < RubyDavUnitTestCase
 
   def expected_props prop_element, prop_keys
     return prop_keys.inject({}) do |h, k|
-      h[k] = RubyDav.find_first(prop_element, "P:#{k.name}", 'P' => k.ns)
+      h[k] = RubyDav.first_element_named prop_element, k.name, k.ns
       next h
     end
   end
@@ -380,8 +384,7 @@ class PropstatResponseTest < RubyDavUnitTestCase
   def setup
     super
 
-    RubyDav.ensure_garbage_collection do
-      @propfind_response_str = <<EOS
+    @propfind_response_str = <<EOS
 <?xml version="1.0" encoding="utf-8" ?>
 <D:multistatus xmlns:D="DAV:">
   <D:response>
@@ -438,53 +441,53 @@ class PropstatResponseTest < RubyDavUnitTestCase
 </D:multistatus>
 EOS
 
-      propfind_response_root = body_root_element @propfind_response_str
-      @container_response = get_response propfind_response_root, '/container/'
-      @front_response =
-        get_response propfind_response_root, '/container/front.html'
+    propfind_response_root = body_root_element @propfind_response_str
+    @container_response = get_response propfind_response_root, '/container/'
+    @front_response =
+      get_response propfind_response_root, '/container/front.html'
 
-      @container_prop = get_prop @container_response
-      @front_prop = get_prop @front_response
-      @props = {
-        '/container/' => @container_prop,
-        '/container/front.html' => @front_prop
-      }
+    @container_prop = get_prop @container_response
+    @front_prop = get_prop @front_response
+    @props = {
+      '/container/' => @container_prop,
+      '/container/front.html' => @front_prop
+    }
 
-      @container_prop_keys =
-        [
-         RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
-         RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'author'),
-         RubyDav::PropKey.get('DAV:', 'creationdate'),
-         RubyDav::PropKey.get('DAV:', 'displayname'),
-         RubyDav::PropKey.get('DAV:', 'resourcetype'),
-         RubyDav::PropKey.get('DAV:', 'supportedlock')
-        ]
+    @container_prop_keys =
+      [
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'author'),
+       RubyDav::PropKey.get('DAV:', 'creationdate'),
+       RubyDav::PropKey.get('DAV:', 'displayname'),
+       RubyDav::PropKey.get('DAV:', 'resourcetype'),
+       RubyDav::PropKey.get('DAV:', 'supportedlock')
+      ]
 
-      @front_prop_keys =
-        [
-         RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
-         RubyDav::PropKey.get('DAV:', 'creationdate'),
-         RubyDav::PropKey.get('DAV:', 'displayname'),
-         RubyDav::PropKey.get('DAV:', 'getcontentlength'),
-         RubyDav::PropKey.get('DAV:', 'getcontenttype'),
-         RubyDav::PropKey.get('DAV:', 'getetag'),
-         RubyDav::PropKey.get('DAV:', 'getlastmodified'),
-         RubyDav::PropKey.get('DAV:', 'resourcetype'),
-         RubyDav::PropKey.get('DAV:', 'supportedlock')
-        ]
+    @front_prop_keys =
+      [
+       RubyDav::PropKey.get('http://ns.example.com/boxschema/', 'bigbox'),
+       RubyDav::PropKey.get('DAV:', 'creationdate'),
+       RubyDav::PropKey.get('DAV:', 'displayname'),
+       RubyDav::PropKey.get('DAV:', 'getcontentlength'),
+       RubyDav::PropKey.get('DAV:', 'getcontenttype'),
+       RubyDav::PropKey.get('DAV:', 'getetag'),
+       RubyDav::PropKey.get('DAV:', 'getlastmodified'),
+       RubyDav::PropKey.get('DAV:', 'resourcetype'),
+       RubyDav::PropKey.get('DAV:', 'supportedlock')
+      ]
 
 
-      @expected_container_props =
-        expected_props @container_prop, @container_prop_keys
-      @expected_front_props = expected_props @front_prop, @front_prop_keys
+    @expected_container_props =
+      expected_props @container_prop, @container_prop_keys
+    @expected_front_props = expected_props @front_prop, @front_prop_keys
 
-      @expected_container_results = get_results @expected_container_props
-      @expected_front_results = get_results @expected_front_props
+    @expected_container_results = get_results @expected_container_props
+    @expected_front_results = get_results @expected_front_props
 
-      @response =
-        RubyDav::PropstatResponse.create('/container/', '207', {},
-                                         @propfind_response_str, :propfind)
-      @propfind2_response_str = <<EOS
+    @response =
+      RubyDav::PropstatResponse.create('/container/', '207', {},
+                                       @propfind_response_str, :propfind)
+    @propfind2_response_str = <<EOS
 <?xml version="1.0" encoding="utf-8" ?>
 <D:multistatus xmlns:D="DAV:">
   <D:response>
@@ -510,20 +513,20 @@ EOS
   </D:response>
 </D:multistatus>
 EOS
-      @propfind2_response_root = body_root_element @propfind2_response_str
-      @container2_response =
-        get_response @propfind2_response_root, '/container2/'
-      @container2_200_prop = get_prop @container2_response
-      @container2_401_prop = get_prop @container2_response, 'HTTP/1.1 401 Unauthorized'
-      @container2_403_prop = get_prop @container2_response, 'HTTP/1.1 403 Forbidden'
+    @propfind2_response_root = body_root_element @propfind2_response_str
+    @container2_response =
+      get_response @propfind2_response_root, '/container2/'
+    @container2_200_prop = get_prop @container2_response
+    @container2_401_prop = get_prop @container2_response, 'HTTP/1.1 401 Unauthorized'
+    @container2_403_prop = get_prop @container2_response, 'HTTP/1.1 403 Forbidden'
 
-      @supportedlock_pk = RubyDav::PropKey.get('DAV:', 'supportedlock')
+    @supportedlock_pk = RubyDav::PropKey.get('DAV:', 'supportedlock')
 
-      @response2 =
-        RubyDav::PropstatResponse.create('/container2/', '207', {},
-                                         @propfind2_response_str, :propfind)
+    @response2 =
+      RubyDav::PropstatResponse.create('/container2/', '207', {},
+                                       @propfind2_response_str, :propfind)
 
-      @propfind3_response_str = <<EOS
+    @propfind3_response_str = <<EOS
 <?xml version="1.0" encoding="utf-8" ?> 
 <D:multistatus xmlns:D="DAV:"> 
   <D:response> 
@@ -538,17 +541,16 @@ EOS
   </D:response> 
 </D:multistatus>
 EOS
-      propfind3_response_root = body_root_element @propfind3_response_str
-      file_response =
-        get_response propfind3_response_root, 'http://www.example.com/file'
-      file_prop = get_prop file_response
-      file_prop_keys = [@displayname_pk, @getcontentlength_pk]
-      expected_file_props = expected_props file_prop, file_prop_keys
-      @expected_file_results = get_results expected_file_props
-      @response3 =
-        RubyDav::PropstatResponse.create('http://www.example.com/file', '207', {},
-                                         @propfind3_response_str, :propfind)
-    end
+    propfind3_response_root = body_root_element @propfind3_response_str
+    file_response =
+      get_response propfind3_response_root, 'http://www.example.com/file'
+    file_prop = get_prop file_response
+    file_prop_keys = [@displayname_pk, @getcontentlength_pk]
+    expected_file_props = expected_props file_prop, file_prop_keys
+    @expected_file_results = get_results expected_file_props
+    @response3 =
+      RubyDav::PropstatResponse.create('http://www.example.com/file', '207', {},
+                                       @propfind3_response_str, :propfind)
   end
 
   # tests [] operator
@@ -644,7 +646,7 @@ EOS
      [@resourcetype_pk, '401', @container2_401_prop],
      [@supportedlock_pk, '403', @container2_403_prop]].each do |arr|
       pk, status, prop_element = arr
-      prop = RubyDav.find_first prop_element, "P:#{pk.name}", 'P' => pk.ns
+      prop = RubyDav.first_element_named prop_element, pk.name, pk.ns
       expected[pk] = RubyDav::PropertyResult.new pk, status, prop
     end
 

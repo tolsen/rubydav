@@ -14,7 +14,7 @@ module RubyDav
 
       resources.each do |u, hsh|
         next unless u =~ /^#{url}\/[^\/]+$/
-        owner = RubyDav.find_first_text hsh[:owner].element, 'D:href'
+        owner = RubyDav.first_element_named(hsh[:owner].element, 'href').content
         hsh.each do |pk, pr|
           next unless pk.ns == Bitmark::BITMARK_NS && pr.status == '200'
           @bitmarks << Bitmark.new(pk.name, pr.inner_value, owner, u)
