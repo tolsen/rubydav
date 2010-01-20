@@ -13,13 +13,7 @@ module RubyDav
     class << self
 
       def from_elem elem
-        privileges = nil
-        RubyDav.find(elem, 'D:privilege/*') do |elems|
-          privileges = elems.map do |p|
-            next PropKey.get(RubyDav.namespace_href(p), p.name)
-          end
-        end
-        return new(*privileges)
+        return new(*RubyDav.privilege_elements_to_propkeys(elem))
       end
       
     end

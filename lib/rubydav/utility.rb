@@ -64,43 +64,6 @@ module RubyDav
              end
     end
 
-    @@gc_block_count = 0
-
-    # setting force to true will force the garbage collection to
-    # happen after leaving the block.  Otherwise garbage collection
-    # will not happen if we are already inside an ensure_garbage_collection
-    # call
-    def ensure_garbage_collection force = false, &block
-      @@gc_block_count += 1
-      yield
-    ensure
-      @@gc_block_count -= 1
-      GC.start if force || @@gc_block_count.zero?
-    end
-
-    # does find, but with D => DAV: added to nslist.
-    #
-    # yields instead of returning XPath object as to not trigger
-    # libxml segfault.
-    # See http://libxml.rubyforge.org/rdoc/classes/LibXML/XML/Document.html#M000471
-    def find node, xpath, nslist = nil, &block
-      yield node.find(xpath, davify_nslist(nslist))
-      return nil
-    end
-
-    # does find_first, but with D => DAV: added to nslist
-    def find_first node, xpath, nslist = nil
-      return node.find_first(xpath, davify_nslist(nslist))
-    end
-
-    # runs find_first against the xpath with "/text()" appended
-    # and converts to String
-    # return nil if not found
-    def find_first_text node, xpath, nslist = nil
-      text_node = find_first node, "#{xpath}/text()", nslist
-      return text_node.nil? ? nil : text_node.to_s
-    end
-
     @@generalize_principal_rx =
       /^#{URI::REGEXP::PATTERN::SCHEME}:\/\/#{URI::REGEXP::PATTERN::AUTHORITY}/
 
@@ -116,7 +79,8 @@ module RubyDav
     end
 
     def namespace_href node
-      return node.namespaces.namespace.href
+      ns = node.namespaces.namespace
+      return ns.nil? ? nil : ns.href
     end
     
     def assert_elem_name elem, name, namespace = 'DAV:'
@@ -134,23 +98,61 @@ module RubyDav
       !node.nil? && namespace_href(node) == ns && node.name == name
     end
 
-    # wraps methods in an ensure_garbage_collection() block
-    # to make sure garbage collection is done and to also minimize
-    # the number of garbage collections
-    def gc_protect klass, *methods
-      methods.each do |method|
-        klass.module_eval <<-"end;"
-          unless instance_methods.include? :__#{method.to_i}__
-            alias_method :__#{method.to_i}__, :#{method.to_s}
-            private :__#{method.to_i}__
-            def #{method.to_s}(*args, &block)
-              RubyDav.ensure_garbage_collection do
-                return __#{method.to_i}__(*args, &block)
-              end
-            end
-          end
-        end;
+    def dav_elements node
+      elements = []
+      each_dav_element(node) { |e| elements << e }
+      return elements
+    end
+
+    def dav_elements_hash node, *names
+      hsh = {}
+      each_dav_element node do |e|
+        hsh[e.name] = e if names.include? e.name
       end
+      return hsh
+    end
+
+    def each_dav_element node, &block
+      each_element_in_namespace node, 'DAV:', &block
+    end
+
+    def each_element_in_namespace node, ns, &block
+      node.each_element do |e|
+        yield e if namespace_href(e) == ns
+      end
+    end
+
+    def each_element_named node, name, ns = 'DAV:', &block
+      node.each_element do |e|
+        yield e if namespace_href(e) == ns && e.name == name
+      end
+    end
+
+    def element_to_propkey elem
+      return PropKey.get(RubyDav.namespace_href(elem), elem.name)
+    end
+
+    def elements_named node, name, ns = 'DAV:'
+      elements = []
+      each_element_named(node, name, ns) { |e| elements << e }
+      return elements
+    end
+
+    def first_element node
+      node.each_element { |n| return n }
+      return nil
+    end
+
+    def first_element_named node, name, ns = 'DAV:'
+      each_element_named(node, name, ns) { |n| return n }
+      return nil
+    end
+
+    # follows names until it comes to element
+    def get_dav_descendent node, *names
+      return node if names.empty? || node.nil?
+      next_node = first_element_named node, names.shift
+      return get_dav_descendent(next_node, *names)
     end
 
     # to_s of a copy
@@ -158,16 +160,26 @@ module RubyDav
     def to_s_copy node, options = {}
       node.copy(true).to_s options
     end
+
+    def privilege_elements_to_propkeys parent_elem
+      propkeys = []
+      RubyDav.each_element_named parent_elem, 'privilege' do |privilege_node|
+        seen_child = false
+        privilege_node.each_element do |e|
+          raise "cannot have more than one privilege inside <privilege>" if seen_child
+          propkeys << RubyDav.element_to_propkey(e)
+          seen_child = true
+        end
+        raise "privilege node has no child!" unless seen_child
+      end
+      return propkeys
+    end
     
   end
 
 
   class << self
     include Utility
-  end
-
-  module Utility
-    RubyDav.gc_protect self, :find, :find_first
   end
 
 end

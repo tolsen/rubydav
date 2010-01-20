@@ -154,30 +154,32 @@ module RubyDav
         raise BadResponseError unless node_has_name? root, 'multistatus'
         description = nil
 
-        ensure_garbage_collection true do 
+        rd_elem = first_element_named root, 'responsedescription'
+        description = rd_elem.nil? ? nil : rd_elem.content
 
-          description = find_first_text root, 'D:responsedescription'
-          
-          find(root, "D:response") do |response_elements|
-            
-            raise BadResponseError if response_elements.empty?
+        response_elements = elements_named root, 'response'
+        
+        raise BadResponseError if response_elements.empty?
 
-            response_elements.each do |response_element|
-              sub_status_str = find_first_text response_element, "D:status"
-              sub_status = parse_status sub_status_str
-              error_elem = find_first response_element, 'D:error'
-              error = DavError.parse error_elem
-              sub_description = find_first_text response_element, 'D:responsedescription'
-              location = find_first_text response_element, 'D:location'
-              
-              find(response_element, "D:href/text()") do |hrefs|
-                hrefs.each do |href|
-                  raise BadResponseError if responses.include? href
-                  responses[href.to_s] =
-                    SubResponse.new href.to_s, sub_status, error, sub_description, location
-                end
-              end
-            end
+        response_elements.each do |response_element|
+          children = dav_elements_hash(response_element, 'status', 'error',
+                                       'responsedescription', 'location')
+          children_text =
+            %w(status responsedescription location).inject({}) do |h, k|
+            h[k] = children[k].content if children.include? k
+            next h
+          end
+
+          sub_status = parse_status children_text['status']
+          error = DavError.parse children['error']
+
+          each_element_named response_element, 'href' do |href_elem|
+            href = href_elem.content
+            raise BadResponseError if responses.include? href
+            responses[href] =
+              SubResponse.new(href, sub_status, error,
+                              children_text['description'],
+                              children_text['location'])
           end
         end
         
@@ -237,15 +239,11 @@ module RubyDav
 
       def parse_body(body)
         root = XML::Document.string(body).root
-        ld = nil
         
-        ensure_garbage_collection true do 
-          ld_elem = find_first root, '/D:prop/D:lockdiscovery'
-          raise BadResponseError if ld_elem.nil?
-          ld = RubyDav::LockDiscovery.from_elem(ld_elem)
-        end
-        
-        return ld
+        raise BadResponseError unless node_has_name? root, 'prop'
+        ld_elem = first_element_named root, 'lockdiscovery'
+        raise BadResponseError if ld_elem.nil?
+        return RubyDav::LockDiscovery.from_elem(ld_elem)
       rescue ArgumentError
         raise BadResponseError
       end
@@ -501,21 +499,17 @@ module RubyDav
           pk = PropKey.strictly_prop_key k
           next h.include?(pk) ? h[pk] : nil
         end
-        
-        find(parent_elem, 'D:propstat') do |propstats|
-          propstats.each do |ps_elem|
-            status_text = find_first_text ps_elem, 'D:status'
-            raise BadResponseError if status_text.nil?
-            status = parse_status status_text
 
-            dav_error_elem = find_first ps_elem, 'D:error'
-            dav_error = DavError.parse dav_error_elem
+        each_element_named parent_elem, 'propstat' do |ps_elem|
+          ps_children = dav_elements_hash ps_elem, 'status', 'error', 'prop'
+          raise BadResponseError unless ps_children.include? 'status'
+          status = parse_status ps_children['status'].content
 
-            find_first(ps_elem, 'D:prop').each_element do |property|
-              pk = PropKey.get(namespace_href(property), property.name)
-              result = PropertyResult.new pk, status, property, dav_error
-              properties[pk] = result
-            end
+          dav_error = DavError.parse ps_children['error']
+          ps_children['prop'].each_element do |property|
+            pk = PropKey.get(namespace_href(property), property.name)
+            result = PropertyResult.new pk, status, property, dav_error
+            properties[pk] = result
           end
         end
 
@@ -527,19 +521,16 @@ module RubyDav
         root = XML::Document.string(body).root
         assert_elem_name root, 'multistatus'
 
-        find(root, 'D:response') do |responses|
-          return responses.inject({}) do |h, r|
-            href = find_first_text r, 'D:href'
-            raise BadResponseError if href.nil?
-            h[href] = parse_propstats r
-            next h
-          end
+        return elements_named(root, 'response').inject({}) do |h, r|
+          href_elem = first_element_named r, 'href'
+          raise BadResponseError if href_elem.nil?
+          href = href_elem.content
+          h[href] = parse_propstats r
+          next h
         end
       rescue ArgumentError
         raise BadResponseError
       end
-
-      RubyDav.gc_protect self, :parse_propstats
 
     end
     

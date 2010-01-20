@@ -25,9 +25,11 @@ module RubyDav
       def from_elem elem
         RubyDav.assert_elem_name elem, 'lockdiscovery'
 
-        RubyDav.find elem, 'D:activelock' do |elems|
-          return new(*elems.map() { |l| ActiveLock.from_elem l } )
+        locks = RubyDav.elements_named(elem, 'activelock').map do |l|
+          ActiveLock.from_elem l
         end
+
+        return new(*locks)
       end
 
     end

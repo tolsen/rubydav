@@ -34,44 +34,41 @@ module RubyDav
       def from_elem elem
         RubyDav.assert_elem_name elem, 'activelock'
 
-        al_elements =
-          [:locktype, :lockscope, :depth, :owner,
-           :timeout, :locktoken, :lockroot].inject({}) do |h, k|
-          h[k] = RubyDav.find_first elem, "D:#{k.to_s}"
-          next h
-        end
+        children = RubyDav.dav_elements_hash(elem, 'locktype', 'lockscope',
+                                             'depth', 'owner', 'timeout',
+                                             'locktoken', 'lockroot')
 
-        required_elements = [ :locktype, :lockscope, :depth ]
+        required_elements = %w(locktype lockscope depth)
         raise ArgumentError if
-          al_elements.values_at(*required_elements).any? { |v| v.nil? }
+          children.values_at(*required_elements).any? { |v| v.nil? }
 
-        type = al_elements[:locktype].first.name.to_sym
-        scope = al_elements[:lockscope].first.name.to_sym
-        depth = parse_depth al_elements[:depth]
+        type = RubyDav.first_element(children['locktype']).name.to_sym
+        scope = RubyDav.first_element(children['lockscope']).name.to_sym
+        depth = parse_depth children['depth']
 
         # These elements are optional inside of DAV:activelock
         # (DAV:lockroot was introduced in RFC 4918)
         owner = timeout = token = root = nil
 
-        owner = RubyDav.inner_xml_copy(al_elements[:owner]).strip unless
-          al_elements[:owner].nil?
+        owner = RubyDav.inner_xml_copy(children['owner']).strip if
+          children.include? 'owner'
 
-        timeout = parse_timeout(al_elements[:timeout]) unless
-          al_elements[:timeout].nil?
+        timeout = parse_timeout(children['timeout']) if
+          children.include? 'timeout'
 
-        token = parse_element_with_href(al_elements[:locktoken]) unless
-          al_elements[:locktoken].nil?
+        token = parse_element_with_href(children['locktoken']) if
+          children.include? 'locktoken'
 
-        root = parse_element_with_href(al_elements[:lockroot]) unless
-          al_elements[:lockroot].nil?
+        root = parse_element_with_href(children['lockroot']) if
+          children.include? 'lockroot'
 
         return new(type, scope, depth, timeout, owner, token, root)
       end
         
       def parse_element_with_href element
-        href = RubyDav.find_first_text element, 'D:href'
-        raise ArgumentError if href.nil?
-        return href.strip
+        href_elem = RubyDav.first_element_named element, 'href'
+        raise ArgumentError if href_elem.nil?
+        return href_elem.content.strip
       end
 
       def parse_depth depth_element
@@ -92,8 +89,6 @@ module RubyDav
                end
       end
 
-      RubyDav.gc_protect self, :from_elem
-      
     end
   end
 end
