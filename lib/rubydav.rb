@@ -455,6 +455,10 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         request :get, url, nil, options
       end
 
+      def head(url, options={})
+        request :head, url, nil, options
+      end
+
       # HTTP POST request.
       #
       def post(url, body, options={})
