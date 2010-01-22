@@ -96,6 +96,15 @@ class WebDavPropsTest < Test::Unit::TestCase
     assert_equal '404', response.status
   end
 
+  def test_proppatch_empty_displayname
+    new_file 'test_set_empty_name'
+    response = @request.proppatch('test_set_empty_name', { :displayname => '' })
+    assert_equal '207', response.status
+    assert !response.error?
+
+    delete_file 'test_set_empty_name'
+  end
+
   # check that server retains XML Information Items in property values
   def test_mixed_content
     response = @request.delete('file')
