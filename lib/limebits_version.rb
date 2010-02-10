@@ -6,7 +6,7 @@ module LimebitsVersion
       return Dir.chdir(dir_path) do 
 
         git_branch_string =
-          execute('set -o pipefail; git branch --no-color | grep \\* | cut -d" " -f2')[0].strip
+          execute('bash -c "set -o pipefail; git branch --no-color | grep \\* | cut -d\' \' -f2"')[0].strip
         git_commit_string = execute('git log -n1 --pretty=format:%H')[0].strip
 
         git_tag_string = nil
@@ -21,7 +21,7 @@ module LimebitsVersion
 
         pristine =
           execute("(git submodule foreach 'git status -a; test $? -ne 0'" +
-                  " && (git status -a; test $? -ne 0)) >& /dev/null",
+                  " && (git status -a; test $? -ne 0)) > /dev/null 2>&1",
                   [0, 1])[1] == 0
 
         next {
