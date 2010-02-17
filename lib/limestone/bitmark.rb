@@ -12,7 +12,7 @@ module RubyDav
 
       # the url for the collection at which the bitmark is stored
       # The url is of the form /bitmarks/<uuid>/col
-      attr_reader :url
+      attr_accessor :url
 
       def hash
         return "#{@name.hash}/#{@value.hash}/#{@owner.hash}".hash
