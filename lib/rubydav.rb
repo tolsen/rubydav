@@ -986,6 +986,9 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         
         request.add_field('Authorization', auth.authorization(request.method, requesturl)) unless auth.nil?
 
+        options[:headers].each { |k, v| request[k] = v } if
+          options.include? :headers
+
         http_response = @connection_pool.request(uri, request)
 
         @logger.debug { http_response.body }
