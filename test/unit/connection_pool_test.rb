@@ -20,20 +20,30 @@ class ConnectionPoolTestCase < RubyDavTestCase
   end
 
   def test_brackets   # test_[]
-    flexmock(Net::HTTP).should_receive(:new).once.with('example.com',80).and_return(:http)
+    http = mock_http
+    flexmock(Net::HTTP).should_receive(:new).once.with('example.com',80).
+      and_return(http)
 
-    assert_equal :http, @pool.send(:[], @uri)  # first creates it
-    assert_equal :http, @pool.send(:[], @uri)  # now it's cached
+    assert_equal http, @pool.send(:[], @uri)  # first creates it
+    assert_equal http, @pool.send(:[], @uri)  # now it's cached
   end
 
   def test_delete
+    http1, http2 = [mock_http, mock_http]
+    
     flexmock(Net::HTTP).should_receive(:new).twice.with('example.com',80).
-      and_return(:http1, :http2)
+      and_return(http1, http2)
 
-    assert_equal :http1, @pool.send(:[], @uri)  # first creates it
-    assert_equal :http1, @pool.send(:[], @uri)  # now it's cached
-    assert_equal :http1, @pool.send(:delete, @uri) # now delete it
-    assert_equal :http2, @pool.send(:[], @uri)  # now it creates a second
+    assert_equal http1, @pool.send(:[], @uri)  # first creates it
+    assert_equal http1, @pool.send(:[], @uri)  # now it's cached
+    assert_equal http1, @pool.send(:delete, @uri) # now delete it
+    assert_equal http2, @pool.send(:[], @uri)  # now it creates a second
+  end
+
+  def test_initialize
+    assert_nil @pool.ssl_verify_mode
+    pool2 = ConnectionPool.new :ssl_verify_mode => :bogus_mode
+    assert_equal :bogus_mode, pool2.ssl_verify_mode
   end
 
   def test_request
@@ -73,7 +83,15 @@ class ConnectionPoolTestCase < RubyDavTestCase
 
   # helpers
 
+  def mock_http mock = flexmock, ssl = false
+    # The code no longer sets use_ssl unless it's true
+    #    return mock.should_receive(:use_ssl=).once.with(ssl).mock
+    return mock
+  end
+
   def mock_http_constructor *httpees
+    httpees.each { |http| mock_http http }
+    
     flexmock(Net::HTTP).should_receive(:new).times(httpees.length).
       with('example.com', 80).and_return(*httpees)
   end
