@@ -33,6 +33,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   require File.dirname(__FILE__) + '/rubydav/supported_privilege_set'
   require File.dirname(__FILE__) + '/rubydav/webdav'
 
+  require 'stringio'
+
   require 'rubygems'
   require 'log4r'
   require 'shared-mime-info'
@@ -986,6 +988,9 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         
         request.add_field('Authorization', auth.authorization(request.method, requesturl)) unless auth.nil?
 
+        options[:headers].each { |k, v| request[k] = v } if
+          options.include? :headers
+
         http_response = @connection_pool.request(uri, request)
 
         @logger.debug { http_response.body }
@@ -1068,6 +1073,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         if options.include? :destination
           options[:destination] = fullurl options[:destination]
         end
+
+        stream = StringIO.new stream if stream.is_a? String
         
         unless stream.nil? || options.include?(:content_type)
           mimetype = stream.is_a?(File) ? MIME.check(stream.path) : MIME.check_magics(stream)
@@ -1154,6 +1161,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       # * <tt>:realm</tt> => authentication realm (optional)
       # * <tt>:digest_session</tt> => File to store and load digest session info
       # * <tt>:force_basic_auth</tt> => <tt>true</tt> | <tt>false</tt> (defaults to <tt>false</tt>)
+      # * <tt>:ssl_verify_mode</tt> => OpenSSL verification mode (e.g. OpenSSL::SSL::VERIFY_PEER, OpenSSL::SSL::VERIFY_NONE, etc.)
       #
       # For digest auth, the password equivalent is the hash (usually MD5) of A1
       # (username:realm:password).  It can be used in place of a
@@ -1167,7 +1175,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
         options = { :base_url => '', :log_level => 'INFO' }.merge options
         @global_opts = options
         @auth_world = AuthWorld.new
-        @connection_pool = ConnectionPool.new
+        @connection_pool = ConnectionPool.new(:ssl_verify_mode =>
+                                              options[:ssl_verify_mode])
 
         @logger = Log4r::Logger.new "RubyDav Request #{object_id}"
         @logger.outputters = Log4r::Outputter.stdout
