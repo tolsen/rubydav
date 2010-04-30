@@ -50,7 +50,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
         :displayname => 'Butters',
         :email => 'cartman@example.com'
     })
-    assert_equal '422', response.status
+    assert_equal '409', response.status
     assert_dav_error response, "email-available"
 
     delete_user 'cartman'
@@ -82,7 +82,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
         :password => 'cartman'
     })
 
-    assert_equal '422', response.status
+    assert_equal '409', response.status
     assert_dav_error response, "email-available"
 
     delete_user 'cartman'
