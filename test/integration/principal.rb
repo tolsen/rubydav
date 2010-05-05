@@ -67,6 +67,16 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_dav_error response, "email-valid"
   end
     
+  def test_create_user_invalid_email_with_backslash
+    response = @request.put_user(@cartman_uri,
+                                 :email => 'cart\\man@southpark.com',
+                                 :username => 'cartman',
+                                 :displayname => 'Eric',
+                                 :new_password => 'cartman')
+    assert_equal '409', response.status
+    assert_dav_error response, "email-valid"
+  end
+    
   def test_update_user_duplicate_email
      # create a user with a particular email
     create_cartman
