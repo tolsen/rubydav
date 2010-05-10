@@ -10,6 +10,15 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     @cartman_uri = get_principal_uri 'cartman'
   end
 
+  def create_cartman
+    response = @request.put_user(@cartman_uri,
+                                 :email => 'cartman@southpark.com',
+                                 :username => 'cartman',
+                                 :displayname => 'Eric',
+                                 :new_password => 'cartman')
+    assert_equal '201', response.status
+  end
+
   def delete_user user
     response = @request.delete(get_home_path(user), admincreds)
     assert_equal '204', response.status
@@ -19,9 +28,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_put_for_creating_user
-    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
-    assert_equal '201', response.status
-
+    create_cartman
     delete_user 'cartman'
   end
 
@@ -35,20 +42,14 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_create_user_duplicate_email
-
     # create a user with a particular email
-    response = @request.put_user(@cartman_uri, {
-        :new_password => 'cartman', 
-        :displayname => 'Eric',
-        :email => 'cartman@example.com'
-    })
-    assert_equal '201', response.status
+    create_cartman
 
     # try to create another user with same email
     response = @request.put_user(get_principal_uri('butters'), {
         :new_password => 'butters', 
         :displayname => 'Butters',
-        :email => 'cartman@example.com'
+        :email => 'cartman@southpark.com'
     })
     assert_equal '409', response.status
     assert_dav_error response, "email-available"
@@ -56,15 +57,30 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'cartman'
   end
 
+  def test_create_user_invalid_email
+    response = @request.put_user(@cartman_uri,
+                                 :email => 'cart..man@southpark.com',
+                                 :username => 'cartman',
+                                 :displayname => 'Eric',
+                                 :new_password => 'cartman')
+    assert_equal '409', response.status
+    assert_dav_error response, "email-valid"
+  end
+    
+  def test_create_user_invalid_email_with_backslash
+    response = @request.put_user(@cartman_uri,
+                                 :email => 'cart\\man@southpark.com',
+                                 :username => 'cartman',
+                                 :displayname => 'Eric',
+                                 :new_password => 'cartman')
+    assert_equal '409', response.status
+    assert_dav_error response, "email-valid"
+  end
+    
   def test_update_user_duplicate_email
      # create a user with a particular email
-    response = @request.put_user(@cartman_uri, {
-        :new_password => 'cartman', 
-        :displayname => 'Eric',
-        :email => 'cartman@example.com'
-    })
-    assert_equal '201', response.status
-
+    create_cartman
+    
     # try to create another user with different email
     response = @request.put_user(get_principal_uri('butters'), {
         :new_password => 'butters', 
@@ -72,7 +88,6 @@ class LimestonePrincipalTest < Test::Unit::TestCase
         :email => 'butters@example.com'
     })
     assert_equal '201', response.status
-
 
     # try to update email for first user to an email that is already taken
     response = @request.put_user(@cartman_uri, {
@@ -89,9 +104,22 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'butters'
   end
 
+  def test_update_user_invalid_email
+    create_cartman
+
+    response = @request.put_user(@cartman_uri,
+                                 :email => '.cartman@southpark.com',
+                                 :cur_password => 'cartman',
+                                 :password => 'cartman',
+                                 :username => 'cartman')
+    assert_equal '409', response.status
+    assert_dav_error response, "email-valid"
+
+    delete_user 'cartman'
+  end
+
   def test_put_for_updating_displayname
-    response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
-    assert_equal '201', response.status
+    create_cartman
     
     response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
     assert_equal '403', response.status
@@ -108,8 +136,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_put_for_updating_password_requires_current_password
-    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
-    assert_equal '201', response.status
+    create_cartman
 
     # try changing password without old password
     response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :username => 'cartman', :password => 'cartman'})
@@ -122,8 +149,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_put_for_updating_email_requires_current_password
-    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
-    assert_equal '201', response.status
+    create_cartman
 
     # try changing email without password
     response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :username => 'cartman', :password => 'cartman'})
@@ -297,8 +323,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   end
 
   def test_bad_put_user_followed_by_smaller_good_put_user
-    response = @request.put_user(@cartman_uri, { :new_password => 'cartman', :displayname => 'Eric', :email => 'cartman@southpark.com'})
-    assert_equal '201', response.status
+    create_cartman
 
     # big put_user that fails
     response = @request.put_user(@cartman_uri, { :email => 'manbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpig@southpark.com',:username => 'cartman', :password => 'cartman'})
