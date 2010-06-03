@@ -1,7 +1,7 @@
 1) To test LimeStone with RubyDav, please add tests to test/integration folder.
 
 You need to install the following gems:
-builder, testunitxml, shared-mime-info, log4r
+builder, testunitxml, shared-mime-info, log4r, libxml-ruby
 
 Debian/Ubuntu packages: libbsearch-ruby, shared-mime-info
 
