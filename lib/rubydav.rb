@@ -393,8 +393,8 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                               :username => 'tim', :password => 'swordfish'})
   #   puts response.url # display the request URI
   #
-  #   response.resources.each do |bindname, pk2pr|
-  #      puts bindname # name of the child file
+  #   response.resources.each do |url, pk2pr|
+  #      puts url # url of the child file
   #      puts pk2pr[:getcontentlength].inner_value # contentlength of the child file
   #   end
   #
