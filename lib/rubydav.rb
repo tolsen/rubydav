@@ -279,14 +279,10 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                               :propname,
   #                               :username => 'tim', :password => 'swordfish'})
   #
-  # On success, PropMultiResponse with status 207 is returned.  All defined
+  # On success, PropStatResponse with status 207 is returned.  All defined
   # properties can be accessed from the response.
   #
   # === Retrieving all properties (but not their values) defined on a collection and its descendents
-  # PropMultiResponse has a tree structure where a response contains its
-  # immediate children.  We can traverse the tree to get to any descendent of
-  # the Request-URI.
-  #
   # assume /mycollection contains a collection /mysite and /mysite contains a
   # file index.html
   #
@@ -295,17 +291,13 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                               :propname,
   #                               :username => 'tim', :password => 'swordfish'})
   #
-  # On success, PropMultiResponse with status 207 is returned.
+  # On success, PropStatResponse with status 207 is returned.
   #
   # All defined properties can be accessed from the response.
   #
-  # PropMultiResponse defined for /mysite is accessible in this way:
+  # response['/mysite'].keys  # returns a list of PropKeys
   #
-  #   response2 = response.children['mysite']
-  #
-  # PropMultiResponse defined for /index.html is accessible in this way:
-  #
-  #   response3 = response.children['index.html']
+  # response['/mysite/index.html'].keys # returns a list of PropKeys
   #
   # === Retrieving (almost) all properties and values defined on a file
   #
@@ -317,11 +309,17 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                               :allprop,
   #                               :username => 'tim', :password => 'swordfish'})
   #
-  # On success, PropMultiResponse with status 207 is returned.
+  # On success, PropStatResponse with status 207 is returned.
   #
-  # All defined properties can be accessed on the response.
+  # All defined properties can be accessed on the response.  Note that
+  # you can lookup by symbol instead of a PropKey if the property is
+  # the DAV: namespace.  Also note that since this example is a
+  # depth-0 propfind, we do not need to lookup the url first.
   #
-  #   response[:displayname] # gives the file's displayname
+  #   response[:displayname] # gives the file's displayname PropertyResult
+  #   response[:displayname].status # status for the fetching the property
+  #   response[:displayname].value  # value of the property if status is successful (i.e. "<D:displayname xmlns:D='DAV:'>index</D:displayname>"
+  #   response[:displayname].inner_value # inner value of the property if status is successful "index"
   #
   # === Retrieving (almost) all properties and values defined on a collection and its descendents
   #
@@ -332,67 +330,72 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                               :allprop,
   #                               :username => 'tim', :password => 'swordfish'})
   #
-  # On success, PropMultiResponse with status 207 is returned.
+  # On success, PropStatResponse with status 207 is returned.
   #
-  # All properties can be accessed on the response.
   #
-  #   response2 = response.children['/index.html']
+  # The resources attribute of a PropStat response is a hash from urls
+  # (String) to a hash of PropKeys -> PropertyResults
   #
-  # PropMultiResponse#children contains PropMultiResponses for all the immediate
-  # children of the resource.
+  # For example,
   #
-  # We access the PropMultiResponse for index.html's displayname from the
-  # PropMultiResponse of its parent in this way:
+  # response.resources.keys  # all urls in response
   #
-  #   response2[:displayname]
+  # response.resources['/user/mycollection'].keys # all PropKeys on /user/mycollection
+  #
+  # response['/user/mycollection'].keys # same.  all PropKeys on /user/mycollection
+  #
+  # response['/user/mycollection'][:displayname] # PropertyResult for DAV:displayname on /user/mycollection
   #
   # Assuming index.html has a custom property tags with namespace
   # http://example.org/mynamespace, to retrieve the value of this property:
   #
-  #   response2[Propkey.get('http://www.example.com/mynamespace', 'tags')]
+  #   response['/user/mycollection/index.html'][Propkey.get('http://www.example.com/mynamespace', 'tags')].value
   #
   # === Retrieving specified properties and values for a file
   #
-  #   pk = Propkey.get('http://example.org/mynamespace', 'author')
+  #   author_pk = Propkey.get('http://example.org/mynamespace', 'author')
   #   response = RubyDav.propfind('http://www.example.org/user/index.html',
   #                               0,
   #                               :displayname,
-  #                               PropKey.get('http://example.org/namespace','author'),
+  #                               author_pk,
   #                               :username => 'tim', :password => 'swordfish'})
   #
-  # On success, PropMultiResponse with status 207 is returned.
+  # On success, PropStatResponse with status 207 is returned.
   #
   # All specified properties can be accessed from the response.
   #
   # To retrieve the file's displayname:
   #
-  #   response[:displayname]
+  #   response[:displayname].inner_value
   #
   # To retrieve the status associated with displayname property value retrieval:
   #
-  #   response.statuses[:displayname]
+  #   response[:displayname].status
   #
   # If the user has privilege to retrieve the property it will be 200 OK, else
   # appropriate error
   #
-  #   response[Propkey.get('http://example.org/mynamespace', 'author')]
+  #   response[author_pk].inner_value
   #
   # If the user has read privilege on the property, it will give the author
   # property with namespace http://example.org/mynamespace value else nil
   #
   # === Retrieving directory listing for a Request-URI
   #
-  # We send a depth 1 Propfind request to get the directory listing.
-  # PropMultiResponse and its children form the directory listing.
+  # We send a depth 1 Propfind request to effectively get the
+  # directory listing.  Note that a depth-1 Propfind includes the
+  # parent and its immediate children
+  #
   #
   #   response = RubyDav.propfind('http://www.example.org/user/',
   #                               1,
   #                               :getcontentlength, :getcontenttype, :getlastmodified,
   #                               :username => 'tim', :password => 'swordfish'})
-  #   puts response.uri # display the request URI
-  #   response.children.each do |bindname, childresponse|
+  #   puts response.url # display the request URI
+  #
+  #   response.resources.each do |bindname, pk2pr|
   #      puts bindname # name of the child file
-  #      puts childresponse[:getcontentlength] # contentlength of the child file
+  #      puts pk2pr[:getcontentlength].inner_value # contentlength of the child file
   #   end
   #
   # === Updating properties of a file
@@ -406,29 +409,30 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
   #                                props,
   #                                :username => 'tim', :password => 'swordfish'})
   #
-  # PropMultiResponse with status 207 is returned or appropriate error message
+  # PropStatResponse with status 207 is returned or appropriate error message
   # status corresponding to all set/remove properties can be accessed on it.
   #
-  # These return true if successful else nil:
   #
-  #   response[:displayname]
-  #   response[:Propkey.get('http://example.org/mynamespace', 'tags')]
+  #   response[:displayname].status  # returns 200 for success
+  #   response[:Propkey.get('http://example.org/mynamespace', 'tags')].status 
   #
   # === Setting access control properties of a collection
   #
   # acl command overwrites the access control list of a resource
   #
-  # In this example, we first do a propfind_acl in order to retrieve the Acl.
+  # In this example, we first do a propfind in order to retrieve the Acl.
   # Then we prepend a new Ace to the Acl and send it back using RubyDav.acl
   #
-  #   response = RubyDav.propfind_acl('http://www.example.org/user',
-  #                                    0,
-  #                                    :username => 'tim',
-  #                                    :password => 'swordfish'})
+  #   response = RubyDav.propfind('http://www.example.org/user',
+  #                               0,
+  #                               :username => 'tim',
+  #                               :password => 'swordfish'})
   #
-  #   # if propfind_acl was successful
-  #   unless response.error?
-  #      acl = response.acl
+  #  result = response[:acl]
+  #
+  #   # if propfind was successful
+  #   if result.success?
+  #      acl = result.acl
   #      # prepend the new Ace
   #      acl.unshift Ace.new(:grant, 'http://www.example.org/user/mit', false, :all)
   #      response = RubyDav.acl('http://www.example.org/user', acl,
