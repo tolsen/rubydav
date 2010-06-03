@@ -6,9 +6,11 @@ require 'stringio'
 require 'rubygems'
 gem 'builder'
 
-require File.dirname(__FILE__) + '/rubydav.rb'
-require File.dirname(__FILE__) + '/limestone/bitmark.rb'
-require File.dirname(__FILE__) + '/limestone/response.rb'
+require File.dirname(__FILE__) + '/rubydav'
+require File.dirname(__FILE__) + '/limestone/bitmark'
+require File.dirname(__FILE__) + '/limestone/constants'
+require File.dirname(__FILE__) + '/limestone/domain_map'
+require File.dirname(__FILE__) + '/limestone/response'
 
 module RubyDav
 
