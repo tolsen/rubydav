@@ -60,7 +60,6 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   def test_create_user_invalid_email
     response = @request.put_user(@cartman_uri,
                                  :email => 'cart..man@southpark.com',
-                                 :username => 'cartman',
                                  :displayname => 'Eric',
                                  :new_password => 'cartman')
     assert_equal '409', response.status
@@ -70,7 +69,6 @@ class LimestonePrincipalTest < Test::Unit::TestCase
   def test_create_user_invalid_email_with_backslash
     response = @request.put_user(@cartman_uri,
                                  :email => 'cart\\man@southpark.com',
-                                 :username => 'cartman',
                                  :displayname => 'Eric',
                                  :new_password => 'cartman')
     assert_equal '409', response.status
@@ -93,7 +91,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     response = @request.put_user(@cartman_uri, {
         :email => 'butters@example.com',
         :cur_password => 'cartman',
-        :username => 'cartman',
+        :username => 'cartman@southpark.com',
         :password => 'cartman'
     })
 
@@ -111,7 +109,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
                                  :email => '.cartman@southpark.com',
                                  :cur_password => 'cartman',
                                  :password => 'cartman',
-                                 :username => 'cartman')
+                                 :username => 'cartman@southpark.com')
     assert_equal '409', response.status
     assert_dav_error response, "email-valid"
 
@@ -125,7 +123,7 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     assert_equal '403', response.status
 
     # update displayname
-    response = @request.put_user(@cartman_uri, {:displayname => 'Eric Cartman',  :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, {:displayname => 'Eric Cartman',  :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '204', response.status
 
     response = @request.propfind(@cartman_uri, 0, :displayname )
@@ -139,10 +137,10 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     create_cartman
 
     # try changing password without old password
-    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '400', response.status
 
-    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :new_password => 'manbearpig', :cur_password => 'cartman', :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'
@@ -152,10 +150,10 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     create_cartman
 
     # try changing email without password
-    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '400', response.status
 
-    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'
@@ -326,11 +324,11 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     create_cartman
 
     # big put_user that fails
-    response = @request.put_user(@cartman_uri, { :email => 'manbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpig@southpark.com',:username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpigmanbearpig@southpark.com',:username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '400', response.status
 
     # smaller put_user that should succeed
-    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman', :password => 'cartman'})
+    response = @request.put_user(@cartman_uri, { :email => 'manbearpig@southpark.com', :cur_password => 'cartman', :username => 'cartman@southpark.com', :password => 'cartman'})
     assert_equal '204', response.status
 
     delete_user 'cartman'

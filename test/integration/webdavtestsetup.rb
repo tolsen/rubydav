@@ -56,7 +56,7 @@ module WebDavTestSetup
   # creds for 'test' user
   # NOTE: specific to limestone
   def testcreds
-    {:username=>"testuser2@limebits.com", :password => "qwerty"}
+    {:username=>"test2@limebits.com", :password => "qwerty"}
   end
 
   def admincreds
