@@ -14,7 +14,7 @@ module RubyDav
 
   class Request
 
-    # options: :new_password, :displayname, :email, :cur_password
+    # options: :new_password, :displayname, :email, :cur_password, :new_password_hash
     def put_user url, options
       xml = Builder::XmlMarkup.new
       xml.instruct!
@@ -24,10 +24,12 @@ module RubyDav
 
         xml.D(:displayname, options[:displayname]) if options.include? :displayname
         xml.L(:email, options[:email]) if options.include? :email
+        xml.L(:'password-hash', options[:new_password_hash]) if options.include? :new_password_hash
       end
 
       stream = StringIO.new xml.target!
-      put_opts = options.reject{ |k, v| [:new_password, :displayname, :email].include? k }
+      put_opts = options.reject{ |k, v| [:new_password, :displayname, :email,
+                                         :cur_password, :new_password_hash].include? k }
       
       return put(url, stream, put_opts)
     end

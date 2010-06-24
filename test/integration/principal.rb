@@ -32,6 +32,27 @@ class LimestonePrincipalTest < Test::Unit::TestCase
     delete_user 'cartman'
   end
 
+  def test_put_for_creating_user_with_password_hash
+    response = @request.put_user(@cartman_uri,
+                                 :email => 'cartman@southpark.com',
+                                 :username => 'cartman',
+                                 :displayname => 'Eric',
+                                 :new_password_hash => '77f6ca9dce2721c7ddbd7082987ea2a5') # password: qwerty
+    assert_equal '201', response.status
+
+    # check that password of qwerty works
+    response = @request.put('/home/cartman/file', StringIO.new("test_file"),
+                            :username => 'cartman@southpark.com', :password => 'qwerty')
+
+    assert_equal '201', response.status
+
+  ensure
+    @request.delete('/home/cartman/file',
+                    :username => 'cartman@southpark.com',
+                    :password => 'qwerty')
+    delete_user 'cartman'
+  end
+
   def test_create_user_requires_displayname
     response = @request.put_user(@cartman_uri, {:new_password => 'cartman', :email => 'cartman@example.com'})
     assert response.error?
