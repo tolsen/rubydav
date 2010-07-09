@@ -11,6 +11,10 @@ module RubyDav
       @entries = entries
     end
 
+    def to_inner_xml
+      @entries.map { |e| e.to_xml }.join("\n")
+    end
+
     def to_xml xml = nil
       return RubyDav.build_xml(xml) do |xml, namespaces|
         namespaces['xmlns:lb'] = LIMEBITS_NS

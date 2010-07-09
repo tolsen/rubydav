@@ -57,6 +57,20 @@ end
 
 class DomainMapTest < RubyDavUnitTestCase
 
+  def assert_domain_map_matches xml
+    assert_xml_matches xml do |xml|
+      xml.xmlns! :lb => 'http://limebits.com/ns/1.0/'
+      xml.lb :'domain-map' do
+        [1, 2].each do |n|
+        xml.lb :'domain-map-entry' do
+            xml.lb :domain, "domain#{n}"
+            xml.lb :path, "path#{n}"
+          end
+        end
+      end
+    end
+  end
+
   def setup
     @entry1 = RubyDav::DomainMapEntry.new 'domain1', 'path1'
     @entry2 = RubyDav::DomainMapEntry.new 'domain2', 'path2'
@@ -90,19 +104,15 @@ EOS
   end
 
   def test_to_xml
-    assert_xml_matches @domain_map.to_xml do |xml|
-      xml.xmlns! :lb => 'http://limebits.com/ns/1.0/'
-      xml.lb :'domain-map' do
-        [1, 2].each do |n|
-        xml.lb :'domain-map-entry' do
-            xml.lb :domain, "domain#{n}"
-            xml.lb :path, "path#{n}"
-          end
-        end
-      end
-    end
+    assert_domain_map_matches @domain_map.to_xml 
   end
 
+  def test_to_inner_xml
+    full_xml = "<lb:domain-map xmlns:lb='http://limebits.com/ns/1.0/'>" +
+      @domain_map.to_inner_xml + "</lb:domain-map>"
+
+    assert_domain_map_matches full_xml
+  end
 
 end
 
