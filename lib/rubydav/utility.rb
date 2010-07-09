@@ -41,7 +41,7 @@ module RubyDav
 
     # yields xml (builder) and namespaces
     # returns output if new xml builder was created
-    def buildXML xml = nil, &block
+    def build_xml xml = nil, &block
       output = nil
       namespaces = {}
       

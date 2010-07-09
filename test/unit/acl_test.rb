@@ -317,9 +317,9 @@ EOS
     RubyDav::Ace.new action, principal, protected, *privileges
   end
   
-  def self.create_printXML_principal_tests *testcases
+  def self.create_to_xml_principal_tests *testcases
     testcases.each do |principal|
-      define_method "test_printXML_ace_principal_#{principal.to_s}" do
+      define_method "test_to_xml_ace_principal_#{principal.to_s}" do
         ace = create_ace :grant, principal, false, "write", "read"
         principal = RubyDav::PropKey.strictly_prop_key principal if ((Symbol === principal) &&
                                                                      (principal != :all) &&
@@ -332,28 +332,28 @@ EOS
     end
   end
   
-  create_printXML_principal_tests(:all, :authenticated, :unauthenticated, :self, 
+  create_to_xml_principal_tests(:all, :authenticated, :unauthenticated, :self, 
                                   RubyDav::PropKey.get("DAV:","owner"), "http://www.example.org/users",
                                   :owners)
   
   
-  def self.create_printXML_action_tests *testcases
+  def self.create_to_xml_action_tests *testcases
     testcases.each do |action|
-      define_method "test_printXML_action_#{action.to_s}" do
+      define_method "test_to_xml_action_#{action.to_s}" do
         ace = create_ace action, :all, false, "write", "read"
         assert_ace_xml ace, :all, action
       end
     end
   end
   
-  create_printXML_action_tests :grant, :deny
+  create_to_xml_action_tests :grant, :deny
   
-  def test_printXML_protected
+  def test_to_xml_protected
     ace = create_ace :grant, :all, true, "write", "read"
     assert_ace_xml ace, :all
   end
   
-  def test_printXML
+  def test_to_xml
     assert_ace_xml @ace, :all
   end
 
@@ -370,7 +370,7 @@ EOS
 
   def assert_ace_xml ace, principal, action = :grant
 
-    assert_xml_matches ace.printXML do |xml|
+    assert_xml_matches ace.to_xml do |xml|
       xml.xmlns! 'DAV:'
       xml.ace do
         
@@ -423,12 +423,12 @@ class InheritedAceTest < AceTest
     assert !@ace.compactable?(ace)
   end
   
-  def test_printXML_inherited
+  def test_to_xml_inherited
     ace = create_ace :grant, :all, false, "write", "read"
     assert_ace_xml ace, :all
   end
   
-  def test_printXML_inherited_protected
+  def test_to_xml_inherited_protected
     ace = create_ace :grant, :all, true, "write", "read"
     assert_ace_xml ace, :all
   end
@@ -608,23 +608,23 @@ EOS
     assert_equal [@read_priv, @read_acl_priv], @acl[0].privileges
   end
   
-  def test_printXML
+  def test_to_xml
     expected_body = create_acl_xml [:all, :grant, ["read-acl"], false, true]
     @acl.unshift @ace
     acl_xml = String.new
     xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
-    @acl.printXML xml
+    @acl.to_xml xml
     assert xml_equal?(expected_body, acl_xml)
   end
   
-  def test_printXML2
+  def test_to_xml2
     expected_body = create_acl_xml([:all, :grant, ["read-acl"], true, true], 
                                    [:all, :grant, ["read-acl"], false, true])
     @acl.unshift @ace
     @acl.unshift @iace
     acl_xml = String.new
     xml = Builder::XmlMarkup.new(:indent => 2, :target => acl_xml)
-    @acl.printXML xml
+    @acl.to_xml xml
     assert xml_equal?(expected_body, acl_xml)
   end
 

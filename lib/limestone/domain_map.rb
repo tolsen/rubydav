@@ -11,11 +11,11 @@ module RubyDav
       @entries = entries
     end
 
-    def printXML xml = nil
-      return RubyDav.buildXML(xml) do |xml, namespaces|
+    def to_xml xml = nil
+      return RubyDav.build_xml(xml) do |xml, namespaces|
         namespaces['xmlns:lb'] = LIMEBITS_NS
         xml.lb :'domain-map', namespaces do
-          @entries.each { |e| e.printXML xml }
+          @entries.each { |e| e.to_xml xml }
         end
       end
     end
@@ -56,8 +56,8 @@ module RubyDav
       @path = path
     end
 
-    def printXML xml = nil
-      return RubyDav.buildXML(xml) do |xml, namespaces|
+    def to_xml xml = nil
+      return RubyDav.build_xml(xml) do |xml, namespaces|
         namespaces['xmlns:lb'] = LIMEBITS_NS
         xml.lb :'domain-map-entry', namespaces do
           xml.lb :domain, domain

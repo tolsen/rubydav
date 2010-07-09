@@ -43,8 +43,8 @@ EOS
     assert_equal '/home/tim/example', @entry.path
   end
 
-  def test_printXML
-    assert_xml_matches @entry.printXML do |xml|
+  def test_to_xml
+    assert_xml_matches @entry.to_xml do |xml|
       xml.xmlns! :lb => 'http://limebits.com/ns/1.0/'
       xml.lb :'domain-map-entry' do
         xml.lb :domain, 'www.example.com'
@@ -89,8 +89,8 @@ EOS
     assert_equal [@entry1, @entry2], @domain_map.entries
   end
 
-  def test_printXML
-    assert_xml_matches @domain_map.printXML do |xml|
+  def test_to_xml
+    assert_xml_matches @domain_map.to_xml do |xml|
       xml.xmlns! :lb => 'http://limebits.com/ns/1.0/'
       xml.lb :'domain-map' do
         [1, 2].each do |n|

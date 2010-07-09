@@ -17,7 +17,7 @@ module SearchHelper
             strict_propkey = RubyDav::PropKey.strictly_prop_key(propkey)
             xml.D(:#{op}) do
               if !is_bitmark
-                xml.D(:prop) { strict_propkey.printXML xml }
+                xml.D(:prop) { strict_propkey.to_xml xml }
               else
                 xml.LB(:bitmark, "xmlns:LB" => "http://limebits.com/ns/1.0/") do
                   xml.BM(propkey, "xmlns:BM" => "http://limebits.com/ns/bitmarks/1.0/")
@@ -65,7 +65,7 @@ END_OF_DEF
     xmlstr = ""
     xml = ::Builder::XmlMarkup.new(:indent => 2, :target => xmlstr)
     xml.D(:"is-defined") do
-      xml.D(:prop) { propkey.printXML xml }
+      xml.D(:prop) { propkey.to_xml xml }
     end
     return xmlstr
   end

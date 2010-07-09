@@ -3,11 +3,11 @@ require 'test/unit/unit_test_helper'
 class RubyDavPropKeyTest < RubyDavUnitTestCase
 
   def generate_and_assert_propkey_xml propkey, expected_xml
-    assert xml_equal?(expected_xml, propkey.printXML)
+    assert xml_equal?(expected_xml, propkey.to_xml)
   end
   
   def generate_and_assert_propkey_xml_with_value propkey, value, expected_xml
-    propkey_xml = propkey.printXML nil, value
+    propkey_xml = propkey.to_xml nil, value
     assert xml_equal?(expected_xml, propkey_xml)
   end
   
@@ -106,25 +106,25 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
     assert_equal "DAV:", propkey.ns
   end
   
-  def test_printXML
+  def test_to_xml
     propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
     expected_xml = "<R:myprop xmlns:R=\"http://www.example.org/mynamespace\"/>"
     generate_and_assert_propkey_xml propkey, expected_xml
   end
   
-  def test_printXML__with_DAV
+  def test_to_xml__with_DAV
     propkey = RubyDav::PropKey.get "DAV:", "myprop"
     expected_xml = "<D:myprop xmlns:D='DAV:'/>"
     generate_and_assert_propkey_xml propkey, expected_xml
   end
   
-  def test_printXML__with_value
+  def test_to_xml__with_value
     propkey = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
     expected_xml = "<R:myprop xmlns:R=\"http://www.example.org/mynamespace\">myvalue</R:myprop>"
     generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml
   end
 
-  def test_printXML__with_value_with_DAV
+  def test_to_xml__with_value_with_DAV
     propkey = RubyDav::PropKey.get "DAV:", "myprop"
     expected_xml = "<D:myprop xmlns:D='DAV:'>myvalue</D:myprop>"
     generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml

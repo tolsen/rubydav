@@ -512,7 +512,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 #             xml.D(:prop) do
 #               props.each do |propkey, value|
 #                 propkey =  PropKey.strictly_prop_key(propkey)
-#                 propkey.printXML xml, value
+#                 propkey.to_xml xml, value
 #               end
 #             end
 #           end
@@ -679,7 +679,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                   xml.D(:prop) do
                     updates.each do |propkey, value|
                       propkey =  PropKey.strictly_prop_key(propkey)
-                      propkey.printXML xml, value
+                      propkey.to_xml xml, value
                     end
                   end
                 end
@@ -705,7 +705,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       def acl(url, acl, options={})
         acl.delete_if{|ace| ace.protected? || ace.kind_of?(InheritedAce)}
         acl.compact! if acl.compacting?
-        stream = RubyDav.build_xml_stream { |xml| acl.printXML xml }
+        stream = RubyDav.build_xml_stream { |xml| acl.to_xml xml }
         request :acl, url, stream, options
       end
 
@@ -774,7 +774,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
             xml.D(:prop) do
               props.each do |prop|
                 propkey = PropKey.strictly_prop_key(prop)
-                propkey.printXML(xml)
+                propkey.to_xml(xml)
               end
             end
           end
@@ -813,7 +813,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                   xml.D(:prop) do
                     props.each do |prop|
                       propkey = PropKey.strictly_prop_key(prop)
-                      propkey.printXML xml
+                      propkey.to_xml xml
                     end
                   end
                   if !bitmarks.nil?
@@ -844,7 +844,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
                     xml.D(:order) do 
                       xml.D(:prop) do 
                         propkey = PropKey.strictly_prop_key(prop)
-                        propkey.printXML xml
+                        propkey.to_xml xml
                       end
                       xml.D(order)
                     end
@@ -1127,7 +1127,7 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       end
 
       def generate_props_xml xml, props
-        props.each { |p| PropKey.strictly_prop_key(p).printXML(xml) }
+        props.each { |p| PropKey.strictly_prop_key(p).to_xml(xml) }
       end
       
       def generate_propfind_bodystream *props

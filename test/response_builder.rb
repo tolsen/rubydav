@@ -67,7 +67,7 @@ EOS
     if (RubyDav::Acl === value)
       body = String.new
       xml = Builder::XmlMarkup.new(:indent => 2, :target => body)
-      value.printXML xml
+      value.to_xml xml
     else
       body = <<EOS
 <D:#{name.to_s} xmlns:D = "#{namespace.to_s}">#{value.to_s}</D:#{name.to_s}>

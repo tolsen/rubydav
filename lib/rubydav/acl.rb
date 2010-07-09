@@ -56,15 +56,15 @@ module RubyDav
               "/#{@isprotected.hash}/#{@privileges.hash}").hash
     end
       
-    def printXML(xml = nil)
-      return RubyDav::buildXML(xml) do |xml, ns|
+    def to_xml(xml = nil)
+      return RubyDav::build_xml(xml) do |xml, ns|
         xml.D :ace, ns do
           xml.D :principal do
             if Symbol === @principal
               xml.D @principal
             elsif PropKey === @principal
               xml.D(:property) do
-                @principal.printXML(xml)
+                @principal.to_xml(xml)
               end
             else
               xml.D(:href, @principal)
@@ -73,7 +73,7 @@ module RubyDav
           xml.D(action) do
             @privileges.each do |priv| 
               xml.D :privilege do
-                PropKey.strictly_prop_key(priv).printXML xml
+                PropKey.strictly_prop_key(priv).to_xml xml
               end
             end
           end
@@ -230,9 +230,9 @@ module RubyDav
       return self
     end
     
-    def printXML(xml)
+    def to_xml(xml)
       xml.D(:acl, "xmlns:D" => "DAV:") do
-        self.each { |ace| ace.printXML(xml) }
+        self.each { |ace| ace.to_xml(xml) }
       end
     end
     

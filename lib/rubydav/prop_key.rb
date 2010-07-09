@@ -69,11 +69,11 @@ module RubyDav
       @ns == "DAV:"
     end
     
-    def printXML(xml = nil, value=:remove)
+    def to_xml(xml = nil, value=:remove)
       # output the prop element for the propkey
       value = (:remove == value) ? "" : value
 
-      return RubyDav::buildXML(xml) do |xml, ns|
+      return RubyDav::build_xml(xml) do |xml, ns|
 
         # one of the ways to check if value is a XmlMarkup,
         # standard is_a? does not work.

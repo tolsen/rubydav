@@ -31,7 +31,7 @@ class RubyDavUnitTestCase < RubyDavTestCase
     elsif RubyDav::PropKey === principal
       property_xml = String.new
       xml = Builder::XmlMarkup.new(:indent => 2, :target => property_xml)
-      principal.printXML xml
+      principal.to_xml xml
       principal_xml = "<D:property>#{property_xml}</D:property>"
     else
       principal_xml = "<D:href>#{principal.to_s}</D:href>"
