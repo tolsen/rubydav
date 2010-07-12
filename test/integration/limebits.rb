@@ -71,14 +71,11 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
   end
 
   def test_null_lb_domain_map
-
-    lb_domain_map_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'domain-map')
     prin_uri = get_principal_uri(@creds[:username])
 
     response = @request.propfind(prin_uri, 0, lb_domain_map_propkey)
     assert_equal '207', response.status
     assert_equal '404', response[lb_domain_map_propkey].status
-
   end
 
   def test_lb_domain_map_property
@@ -88,12 +85,16 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     prin_uri = get_principal_uri(@creds[:username])
 
     # test for single domain-map-entry
-    domain_map = [[altdomain, '/new_root']]
-    set_and_test_domain_map prin_uri, domain_map
+    dm_entry = RubyDav::DomainMapEntry.new altdomain, '/new_root'
+    domain_map = RubyDav::DomainMap.new dm_entry
 
-    # test for multiple domain-map-entries
-    domain_map = [[altdomain2, '/'], [altdomain, '/new_root']]
-    set_and_test_domain_map prin_uri, domain_map
+    domain_map2 = set_and_test_domain_map prin_uri, domain_map
+
+    # test retrieving and appending another entry
+    new_dm_entry = RubyDav::DomainMapEntry.new altdomain2, '/'
+    domain_map2.entries << new_dm_entry
+
+    set_and_test_domain_map prin_uri, domain_map2
 
     # cleanup
     delete_coll 'new_root'
@@ -114,9 +115,11 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     delete_file 'test.html'
   end
 
+  # returns back domain_map from propfind after proppatching
   def set_and_test_domain_map uri, domain_map
-    xml = get_domain_map_xml domain_map
-    response = @request.proppatch(uri, { lb_domain_map_propkey => xml })
+    response = @request.proppatch(uri,
+                                  { lb_domain_map_propkey =>
+                                    domain_map.to_inner_xml.to_sym })
     assert_equal '207', response.status
     assert !response.error?
     assert_equal '200', response[lb_domain_map_propkey].status
@@ -124,29 +127,11 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     response = @request.propfind(uri, 0, lb_domain_map_propkey)
     assert_equal '207', response.status
     assert !response.error?
+    assert_equal '200', response[lb_domain_map_propkey].status
 
-    assert_xml_matches response.body do |xml|
-      xml.xmlns! 'DAV:'
-      xml.xmlns! :lb => 'http://limebits.com/ns/1.0/'
-      xml.multistatus do
-        xml.response do
-          xml.href uri
-          xml.propstat do
-            xml.prop do
-              xml.lb 'domain-map'.to_sym do
-                domain_map.each do |domain, path| 
-                  xml.lb :'domain-map-entry' do
-                    xml.lb(:domain, domain)
-                    xml.lb(:path, path)
-                  end
-                end
-              end
-            end
-            xml.status /HTTP\/1.1\s+200/
-          end
-        end
-      end
-    end
+    domain_map2 = response[lb_domain_map_propkey].domain_map
+    assert_equal domain_map, domain_map2
+    return domain_map2
   end
 
   def altdomain
@@ -163,17 +148,4 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'domain-map')
   end
 
-  def get_domain_map_xml domain_map
-    target = String.new
-    xml = ::Builder::XmlMarkup.new(:indent => 2, :target => target)
-
-    domain_map.each do |domain, path|
-      xml.lb 'domain-map-entry'.to_sym, "xmlns:lb" => "http://limebits.com/ns/1.0/" do
-        xml.lb(:domain, domain)
-        xml.lb(:path, path)
-      end
-    end
-
-    return xml
-  end
 end

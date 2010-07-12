@@ -2,13 +2,24 @@ require 'test/unit/unit_test_helper'
 
 class RubyDavPropKeyTest < RubyDavUnitTestCase
 
+  def assert_xml_equal expected_xml, actual_xml
+    assert(xml_equal?(expected_xml, actual_xml),
+           "expected\n\n#{actual_xml}\n\nto be equal to\n\n#{expected_xml}")
+  end
+
   def generate_and_assert_propkey_xml propkey, expected_xml
-    assert xml_equal?(expected_xml, propkey.to_xml)
+    assert_xml_equal expected_xml, propkey.to_xml
   end
   
   def generate_and_assert_propkey_xml_with_value propkey, value, expected_xml
     propkey_xml = propkey.to_xml nil, value
-    assert xml_equal?(expected_xml, propkey_xml)
+    assert_xml_equal expected_xml, propkey_xml
+  end
+
+  def setup
+    super
+
+    @myprop_pk = RubyDav::PropKey.get "DAV:", "myprop"
   end
   
   def test_compare
@@ -24,20 +35,18 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
   
   def test_dav?
-    propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
 
     assert !propkey2.dav?
-    assert propkey1.dav?
+    assert @myprop_pk.dav?
   end
   
   def test_equality
-    propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "DAV:", "myproperty"
     
-    assert !(propkey1==propkey2)
-    assert propkey1==propkey1
-    assert propkey1.eql?(propkey1)
+    assert !(@myprop_pk==propkey2)
+    assert @myprop_pk==@myprop_pk
+    assert @myprop_pk.eql?(@myprop_pk)
   end
 
   # Although PropKey follows a flyweight pattern, it is currently
@@ -70,28 +79,25 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
   
   def test_get__gives_same_object
-    propkey1 = RubyDav::PropKey.get "DAV:","myprop"
     propkey2 = RubyDav::PropKey.get "DAV:","myprop"
-    assert_equal true, propkey1.object_id == propkey2.object_id
+    assert_equal @myprop_pk.object_id, propkey2.object_id
   end
   
   def test_hash
-    propkey1 = RubyDav::PropKey.get "DAV:", "myprop"
     propkey2 = RubyDav::PropKey.get "DAV:", "myprop"
 
-    assert_equal propkey1.hash, propkey2.hash
+    assert_equal @myprop_pk.hash, propkey2.hash
 
     propkey3 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
     propkey4 = RubyDav::PropKey.get "http://www.example.org/mynamespace", "myprop"
 
     assert_equal propkey3.hash, propkey4.hash
-    assert_not_equal propkey1.hash, propkey4.hash
+    assert_not_equal @myprop_pk.hash, propkey4.hash
   end
 
   def test_name
-    propkey = RubyDav::PropKey.get "DAV:","myprop"
-    assert_not_nil propkey.name
-    assert_equal "myprop", propkey.name
+    assert_not_nil @myprop_pk.name
+    assert_equal "myprop", @myprop_pk.name
   end
   
   def test_name__symbol
@@ -101,9 +107,8 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
   
   def test_ns
-    propkey = RubyDav::PropKey.get "DAV:","myprop"
-    assert_not_nil propkey.ns
-    assert_equal "DAV:", propkey.ns
+    assert_not_nil @myprop_pk.ns
+    assert_equal "DAV:", @myprop_pk.ns
   end
   
   def test_to_xml
@@ -113,9 +118,8 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
   
   def test_to_xml__with_DAV
-    propkey = RubyDav::PropKey.get "DAV:", "myprop"
     expected_xml = "<D:myprop xmlns:D='DAV:'/>"
-    generate_and_assert_propkey_xml propkey, expected_xml
+    generate_and_assert_propkey_xml @myprop_pk, expected_xml
   end
   
   def test_to_xml__with_value
@@ -125,9 +129,13 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
 
   def test_to_xml__with_value_with_DAV
-    propkey = RubyDav::PropKey.get "DAV:", "myprop"
     expected_xml = "<D:myprop xmlns:D='DAV:'>myvalue</D:myprop>"
-    generate_and_assert_propkey_xml_with_value propkey, "myvalue", expected_xml
+    generate_and_assert_propkey_xml_with_value @myprop_pk, "myvalue", expected_xml
+  end
+
+  def test_to_xml__with_symbol_value
+    expected_xml = "<D:myprop xmlns:D='DAV:'>\n<D:foo/>\n</D:myprop>"
+    generate_and_assert_propkey_xml_with_value @myprop_pk, :"<D:foo/>", expected_xml
   end
   
   def test_register_symbol
@@ -157,8 +165,7 @@ class RubyDavPropKeyTest < RubyDavUnitTestCase
   end
   
   def test_to_s
-    propkey = RubyDav::PropKey.get "DAV:", "myprop"
-    assert_equal "{DAV:}myprop", propkey.to_s
+    assert_equal "{DAV:}myprop", @myprop_pk.to_s
   end
   
 end

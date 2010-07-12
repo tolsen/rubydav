@@ -16,6 +16,7 @@ class RubyDavUnitTestCase < RubyDavTestCase
     }
     normalized_expected = LibXML::XML::Document.string(expected, opts).to_s
     normalized_actual = LibXML::XML::Document.string(actual, opts).to_s
+
     return normalized_expected == normalized_actual
   end
   

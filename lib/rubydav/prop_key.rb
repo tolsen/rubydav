@@ -68,30 +68,43 @@ module RubyDav
     def dav?
       @ns == "DAV:"
     end
-    
-    def to_xml(xml = nil, value=:remove)
+
+    # String values are escaped
+    # Symbol values are not escaped
+    def to_xml(xml = nil, value=nil)
       # output the prop element for the propkey
-      value = (:remove == value) ? "" : value
+      value = value.nil? ? "" : value
 
       return RubyDav::build_xml(xml) do |xml, ns|
+        escape = true
 
         # one of the ways to check if value is a XmlMarkup,
         # standard is_a? does not work.
-        # if value.is_a? ::Builder::XmlMarkup
         begin
-          valxml = value.target!
-          if @ns == "DAV:"
-            xml.D(@name.to_sym, ns) {xml << valxml } 
-          else
-            xml.R(@name.to_sym, "xmlns:R" => @ns) { xml << valxml }
-          end
+          value = value.target!
+          escape = false
         rescue NoMethodError
+          escape = !value.is_a?(Symbol)
+        end
+
+        if escape
+          
           if @ns == "DAV:"
             xml.D(@name.to_sym, value.to_s, ns)
           else
             xml.R(@name.to_sym, value.to_s, "xmlns:R" => @ns )
           end
+          
+        else
+          
+          if @ns == "DAV:"
+            xml.D(@name.to_sym, ns) {xml << value.to_s } 
+          else
+            xml.R(@name.to_sym, "xmlns:R" => @ns) { xml << value.to_s }
+          end
+
         end
+        
       end
     end
     

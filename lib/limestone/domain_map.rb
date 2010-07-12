@@ -7,6 +7,12 @@ module RubyDav
 
     attr_reader :entries
 
+    def == other
+      other.is_a?(DomainMap) && entries == other.entries
+    end
+
+    alias :eql? :==
+
     def initialize *entries
       @entries = entries
     end

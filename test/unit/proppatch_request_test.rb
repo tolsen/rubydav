@@ -14,6 +14,10 @@ class ProppatchRequestTest < RubyDavUnitTestCase
 <D:propertyupdate xmlns:D="DAV:">
   <D:set>
     <D:prop>
+      <D:property3>&amp;</D:property3>
+      <D:property4>
+        <D:foo/>
+      </D:property4>
       <R:properties xmlns:R="http://www.example.org/namespace">
         <R:author1>name1</R:author1>
         <R:author2>name2</R:author2>
@@ -29,7 +33,7 @@ class ProppatchRequestTest < RubyDavUnitTestCase
 EOS
     mresponse = mock_response("404")
     flexstub(Net::HTTP).new_instances do |http|
-      http.should_receive(:request).with(on {|req| validate_proppatch(req,body)}).and_return(mresponse)
+      http.should_receive(:request).once.with(on {|req| validate_proppatch(req,body)}).and_return(mresponse)
     end
     
     propkey= RubyDav::PropKey.get("http://www.example.org/namespace","properties") 
@@ -38,7 +42,9 @@ EOS
     valxml.R(:author1, "name1")
     valxml.R(:author2, "name2")
     props[propkey]= valxml
-    props[:property2]= :remove
+    props[:property2] = nil
+    props[:property3] = '&'
+    props[:property4] = :'<D:foo/>'
     
     response = RubyDav::Request.new.proppatch(@url,props)
     assert_equal(response.status,"404")

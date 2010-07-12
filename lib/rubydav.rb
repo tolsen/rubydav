@@ -646,10 +646,6 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
 
       # Proppatch modifies the properties of the Request-URI.
       #
-      # If a property value is :remove, the property is removed. If the property
-      # value is nil, no operation is performed.  In all other cases, the
-      # corresponding value is set.
-      #
       # Proppatch is transactional, either all property updates succeed or all
       # fail.
       #
@@ -662,14 +658,18 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
       #     Propkey.get('http://example.org/mynamespace', 'author2') => nil
       #   }
       #
+      # If a property value is a String, the value is escaped
+      # If a property value is a Symbol, the value is not escaped (a la Builder)
+      # If a property value is nil, the value is removed
+      #
       # Returns
       # * PropstatResponse with statuses containing
       #   * 200 OK, Note if one command succeeded then all succeed
       #   * Error Codes.
       # * appropriate error response
+      require 'pp'
       def proppatch(url, props, options={})
-        setprops = props.reject{|propkey, value| (:remove == value)|| (nil == value) }
-        removeprops = props.reject{|propkey, value| :remove != value}
+        removeprops, setprops = props.partition{ |propkey, value| value.nil? }
 
         stream = RubyDav.build_xml_stream do |xml|
           xml.D(:propertyupdate, "xmlns:D" => "DAV:") do
@@ -677,7 +677,9 @@ unless defined? RubyDav::RUBYDAV_RB_INCLUDED
               if (updates.size > 0)
                 xml.D(method) do
                   xml.D(:prop) do
-                    updates.each do |propkey, value|
+                    updates.sort do |a, b|
+                      a[0].to_s <=> b[0].to_s
+                    end.each do |propkey, value|
                       propkey =  PropKey.strictly_prop_key(propkey)
                       propkey.to_xml xml, value
                     end
