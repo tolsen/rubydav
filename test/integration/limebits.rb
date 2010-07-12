@@ -81,19 +81,14 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
   def test_lb_domain_map_property
     new_coll 'new_root'
     new_file 'new_root/testfile', StringIO.new("test")
-
     prin_uri = get_principal_uri(@creds[:username])
 
     # test for single domain-map-entry
-    dm_entry = RubyDav::DomainMapEntry.new altdomain, '/new_root'
-    domain_map = RubyDav::DomainMap.new dm_entry
-
+    domain_map = RubyDav::DomainMap.new altdomain => '/new_root'
     domain_map2 = set_and_test_domain_map prin_uri, domain_map
 
     # test retrieving and appending another entry
-    new_dm_entry = RubyDav::DomainMapEntry.new altdomain2, '/'
-    domain_map2.entries << new_dm_entry
-
+    domain_map2[altdomain2] = '/'
     set_and_test_domain_map prin_uri, domain_map2
 
     # cleanup

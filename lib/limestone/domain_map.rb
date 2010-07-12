@@ -50,6 +50,9 @@ module RubyDav
       end
 
     end
+
+    PropertyResult.define_class_reader(:domain_map, self,
+                                       'domain-map', LIMEBITS_NS)
     
   end
   
