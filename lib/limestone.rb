@@ -12,13 +12,15 @@ require File.dirname(__FILE__) + '/limestone/response.rb'
 
 module RubyDav
 
+  LIMEBITS_NS = "http://limebits.com/ns/1.0/" unless defined? LIMEBITS_NS
+
   class Request
 
     # options: :new_password, :displayname, :email, :cur_password, :new_password_hash
     def put_user url, options
       xml = Builder::XmlMarkup.new
       xml.instruct!
-      xml.L(:user, "xmlns:L" => "http://limebits.com/ns/1.0/", "xmlns:D" => "DAV:") do
+      xml.L(:user, "xmlns:L" => LIMEBITS_NS, "xmlns:D" => "DAV:") do
         xml.L(:password, options[:new_password]) if options.include? :new_password
         xml.L(:cur_password, options[:cur_password]) if options.include? :cur_password 
 
