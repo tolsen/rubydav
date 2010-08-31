@@ -56,12 +56,14 @@ module WebDavTestUtils
   # NOTE: Currently, very specific to limestone. 
   # Correct way to do this is principal-property-search REPORT.
   def get_principal_uri name, *host
+    # converting emails to usernames, assuming user@email.com has username user
+    canonical_name = name.gsub(/@.*/, '') 
     if host.empty?
       # relative URI
-      principal_uri = '/users/' + name
+      principal_uri = '/users/' + canonical_name
     else
       #absolute URI
-      principal_uri = host[0] + '/users/' + name
+      principal_uri = host[0] + '/users/' + canonical_name
     end
     return principal_uri
   end

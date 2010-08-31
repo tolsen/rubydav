@@ -49,7 +49,7 @@ EOS
       <D:prop>
         <D:owner><D:href>http://limebits.com/users/tim</D:href></D:owner>
         <bm:name>mybit</bm:name>
-        <bm:description>my cool bit</bm:description>
+        <bm:description>my cool bit &amp; more</bm:description>
       </D:prop>
       <D:status>HTTP/1.1 200 OK</D:status>
     </D:propstat>
@@ -86,7 +86,7 @@ EOS
 EOS
 
     @expected_bitmarks =
-      [ bmark('description', 'my cool bit', 'http://limebits.com/users/tim',
+      [ bmark('description', 'my cool bit & more', 'http://limebits.com/users/tim',
               '/bitmarks/abcde/3'),
         bmark('name', 'mybit', 'http://limebits.com/users/tim',
               '/bitmarks/abcde/3'),

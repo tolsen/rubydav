@@ -1,6 +1,6 @@
 require 'test/unit/unit_test_helper'
 
-class AceTest < RubyDavUnitTestCase
+class UtilityTest < RubyDavUnitTestCase
 
   def test_first_element_named
     str = '<a xmlns="DAV:"><b/><c/></a>'
@@ -27,7 +27,17 @@ class AceTest < RubyDavUnitTestCase
     assert_nil RubyDav.get_dav_descendent(root, 'c')
     assert_nil RubyDav.get_dav_descendent(root, 'b', 'd')
   end
+
+  def test_inner_xml_copy__text_node
+    root = LibXML::XML::Document.string('<a>b</a>').root
+    assert_equal 'b', RubyDav.inner_xml_copy(root)
+  end
+
+  def test_inner_xml_copy__text_node_escaping_off
+    root = LibXML::XML::Document.string('<a>&amp;</a>').root
+    root.output_escaping = false
+    assert_equal '&', RubyDav.inner_xml_copy(root)
+  end
   
-    
   
 end
