@@ -60,6 +60,12 @@ EOS
     assert_domain_map_matches full_xml
   end
 
+  def test_to_inner_xml__empty_hash_to_sym
+    assert_nothing_raised(ArgumentError) do
+      assert_equal :"\n", RubyDav::DomainMap.new.to_inner_xml.to_sym
+    end
+  end
+
 end
 
   

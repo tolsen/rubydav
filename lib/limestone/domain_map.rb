@@ -10,7 +10,7 @@ module RubyDav
     end
 
     def to_inner_xml
-      map { |d, p| self.class.entry_to_xml d, p }.join("\n")
+      (map { |d, p| self.class.entry_to_xml d, p }.join("\n")) + "\n"
     end
 
     def to_xml xml = nil
