@@ -88,9 +88,8 @@ class WebDavRedirectTest < Test::Unit::TestCase
     assert_equal 'http://www.example.com/collection/1', response.location
     assert_equal 'http://www.example.com/collection/1', response.redirectref
 
-    # cleanup
-    response = @request.delete('test-collection', :apply_to_redirect_ref => true)
-    assert_equal '204', response.status
+  ensure
+    @request.delete('test-collection', :apply_to_redirect_ref => true)
   end
 
   def reftarget_key
