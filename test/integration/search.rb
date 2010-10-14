@@ -621,29 +621,30 @@ END_OF_WHERE
     delete_coll 'bits'
   end
 
-  def test_copy_copies_bitmarks
-    new_coll 'src'
-    new_coll 'src/subcoll'
-    new_file 'src/file', StringIO.new("file1")
-    new_file 'src/subcoll/file', StringIO.new("file2")
-
-    mark 'src', 'name', 'Source'
-    mark 'src/subcoll', 'name', 'Sub Collection'
-    mark 'src/subcoll', 'tag', 'foo'
-    mark 'src/subcoll', 'tag', 'bar'
-
-    response = @request.copy('src', 'dst', RubyDav::INFINITY, true)
-    assert_equal '201', response.status
-
-    response = @request.search('dst', { homepath + 'dst' => :infinity }, is_collection, :getlastmodified, :bitmarks => ["tag", "name"])
-    assert_equal '207', response.status
-    assert_num_search_results 2, response
-
-    ensure
-    delete_coll 'src'
-    delete_coll 'dst'
-  end
-
+#
+#  def test_copy_copies_bitmarks
+#    new_coll 'src'
+#    new_coll 'src/subcoll'
+#    new_file 'src/file', StringIO.new("file1")
+#    new_file 'src/subcoll/file', StringIO.new("file2")
+#
+#    mark 'src', 'name', 'Source'
+#    mark 'src/subcoll', 'name', 'Sub Collection'
+#    mark 'src/subcoll', 'tag', 'foo'
+#    mark 'src/subcoll', 'tag', 'bar'
+#
+#    response = @request.copy('src', 'dst', RubyDav::INFINITY, true)
+#    assert_equal '201', response.status
+#
+#    response = @request.search('dst', { homepath + 'dst' => :infinity }, is_collection, :getlastmodified, :bitmarks => ["tag", "name"])
+#    assert_equal '207', response.status
+#    assert_num_search_results 2, response
+#
+#    ensure
+#    delete_coll 'src'
+#    delete_coll 'dst'
+#  end
+#
   def setup_bits
     new_coll 'bits'
     new_coll 'bits/bit1'
