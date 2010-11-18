@@ -457,61 +457,61 @@ END_OF_WHERE
     delete_file 'test_search'
   end
 
-  def test_search_lb_bitmarks
-    new_coll 'bits'
-    new_coll 'bits/bit1'
-    new_coll 'bits/bit2'
-    new_coll 'bits/bit3'
-    new_coll 'bits/bit4'
-    new_file 'bits/nonbit1'
-    new_file 'nonbit2'
-
-    mark 'bits/bit1', 'name', 'Bit 1'
-    mark 'bits/bit2', 'name', 'Bit 2'
-    mark 'bits/bit3', 'name', 'Bit 3'
-    mark 'bits/bit1', 'tag', 'green'
-    mark 'bits/bit3', 'tag', 'green'
-    mark 'bits/bit3', 'tag', 'clean'
-    mark 'nonbit2', 'name', 'Non Bit 2'
-   
-    # depth-0, non-bit 
-    response = @request.search('nonbit2', { homepath + 'nonbit2' => 0 }, _not(is_collection), 
-                            :getlastmodified, :bitmarks => ["tag", "name"])
-    assert_equal '207', response.status
-    assert_num_search_results 1, response
-
-    # depth-0, is-bit
-    response = @request.search('bits/bit1', { homepath + 'bits/bit1' => 0 }, is_bit, 
-                            :getlastmodified, :bitmarks => ["tag", "name"])
-    assert_equal '207', response.status
-    assert_num_search_results 1, response
-
-    where = is_bit
-    scope = { homepath => :infinity }
-
-    # depth-infinity, is-bit
-    response = @request.search('', scope, where, 
-                            :getlastmodified, :bitmarks => ["tag", "name"])
-    assert_equal '207', response.status
-    assert_num_search_results 4, response
-
-    # is-bit & tag='green' & limit
-    response = @request.search('', scope, _and(is_bit, eq(:tag, 'green', true)), 
-                            :getlastmodified, :bitmarks => ["tag", "name"], :limit => 2)
-    assert_equal '207', response.status
-    assert_num_search_results 2, response
-    
-    response = @request.search('', scope, where, 
-                            :getlastmodified, :bitmarks => ["tag"])
-    assert_equal '207', response.status
-    assert_num_search_results 4, response
-
-   # TODO: test the actual bitmarks returned
-
-  ensure
-    delete_coll 'bits'
-    delete_file 'nonbit2'
-  end
+#  def test_search_lb_bitmarks
+#    new_coll 'bits'
+#    new_coll 'bits/bit1'
+#    new_coll 'bits/bit2'
+#    new_coll 'bits/bit3'
+#    new_coll 'bits/bit4'
+#    new_file 'bits/nonbit1'
+#    new_file 'nonbit2'
+#
+#    mark 'bits/bit1', 'name', 'Bit 1'
+#    mark 'bits/bit2', 'name', 'Bit 2'
+#    mark 'bits/bit3', 'name', 'Bit 3'
+#    mark 'bits/bit1', 'tag', 'green'
+#    mark 'bits/bit3', 'tag', 'green'
+#    mark 'bits/bit3', 'tag', 'clean'
+#    mark 'nonbit2', 'name', 'Non Bit 2'
+#   
+#    # depth-0, non-bit 
+#    response = @request.search('nonbit2', { homepath + 'nonbit2' => 0 }, _not(is_collection), 
+#                            :getlastmodified, :bitmarks => ["tag", "name"])
+#    assert_equal '207', response.status
+#    assert_num_search_results 1, response
+#
+#    # depth-0, is-bit
+#    response = @request.search('bits/bit1', { homepath + 'bits/bit1' => 0 }, is_bit, 
+#                            :getlastmodified, :bitmarks => ["tag", "name"])
+#    assert_equal '207', response.status
+#    assert_num_search_results 1, response
+#
+#    where = is_bit
+#    scope = { homepath => :infinity }
+#
+#    # depth-infinity, is-bit
+#    response = @request.search('', scope, where, 
+#                            :getlastmodified, :bitmarks => ["tag", "name"])
+#    assert_equal '207', response.status
+#    assert_num_search_results 4, response
+#
+#    # is-bit & tag='green' & limit
+#    response = @request.search('', scope, _and(is_bit, eq(:tag, 'green', true)), 
+#                            :getlastmodified, :bitmarks => ["tag", "name"], :limit => 2)
+#    assert_equal '207', response.status
+#    assert_num_search_results 2, response
+#    
+#    response = @request.search('', scope, where, 
+#                            :getlastmodified, :bitmarks => ["tag"])
+#    assert_equal '207', response.status
+#    assert_num_search_results 4, response
+#
+#   # TODO: test the actual bitmarks returned
+#
+#  ensure
+#    delete_coll 'bits'
+#    delete_file 'nonbit2'
+#  end
 
   def test_search_lb_lastmodified
     setup_bits
