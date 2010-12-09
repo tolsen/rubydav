@@ -2,13 +2,9 @@ require 'stringio'
 require 'uri'
 
 require 'rubygems'
-require 'libxml'
+require 'nokogiri'
 
 require File.dirname(__FILE__) + '/errors'
-
-# Debian Lenny's version of libxml complains too much that
-# DAV: is not a valid URI
-LibXML::XML.default_warnings = false
 
 module RubyDav
 
@@ -75,11 +71,11 @@ module RubyDav
     # creates a copy of each child before doing to_s
     # so that namespaces are properly declared
     def inner_xml_copy node, options = {}
-      return (node.map { |n| to_s_copy n, options }.join '')
+      return (node.children.map { |n| to_s_copy n, options }.join '')
     end
 
     def namespace_href node
-      ns = node.namespaces.namespace
+      ns = node.namespace
       return ns.nil? ? nil : ns.href
     end
     
@@ -117,13 +113,13 @@ module RubyDav
     end
 
     def each_element_in_namespace node, ns, &block
-      node.each_element do |e|
+      node.element_children.each do |e|
         yield e if namespace_href(e) == ns
       end
     end
 
     def each_element_named node, name, ns = 'DAV:', &block
-      node.each_element do |e|
+      node.element_children.each do |e|
         yield e if namespace_href(e) == ns && e.name == name
       end
     end
@@ -139,7 +135,7 @@ module RubyDav
     end
 
     def first_element node
-      node.each_element { |n| return n }
+      node.element_children.each { |n| return n }
       return nil
     end
 
@@ -158,14 +154,14 @@ module RubyDav
     # to_s of a copy
     # useful for getting all namespaces declared
     def to_s_copy node, options = {}
-      node.copy(true).to_s options
+      node.dup.to_xml options
     end
 
     def privilege_elements_to_propkeys parent_elem
       propkeys = []
       RubyDav.each_element_named parent_elem, 'privilege' do |privilege_node|
         seen_child = false
-        privilege_node.each_element do |e|
+        privilege_node.element_children.each do |e|
           raise "cannot have more than one privilege inside <privilege>" if seen_child
           propkeys << RubyDav.element_to_propkey(e)
           seen_child = true
@@ -173,6 +169,18 @@ module RubyDav
         raise "privilege node has no child!" unless seen_child
       end
       return propkeys
+    end
+
+    # returns root
+    def parse_xml str
+      Nokogiri::XML::Document.parse(str).root
+    end
+
+    def xml_lang node
+      lang_attr = node.attribute_with_ns "lang", "http://www.w3.org/XML/1998/namespace"
+      return lang_attr.value unless lang_attr.nil?
+      return nil if node == node.document.root
+      return xml_lang(node.parent)
     end
     
   end

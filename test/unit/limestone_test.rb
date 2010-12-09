@@ -9,7 +9,7 @@ class LimestoneTestCase < RubyDavUnitTestCase
     super
 
     @bitmark_request_body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:allprop/>
   <D:include>
@@ -19,7 +19,7 @@ class LimestoneTestCase < RubyDavUnitTestCase
 EOS
 
     @bitmark_response_body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:multistatus xmlns:D="DAV:" xmlns:bm="http://limebits.com/ns/bitmarks/1.0/">
   <D:response>
     <D:href>/bitmarks/abcde</D:href>
@@ -86,7 +86,7 @@ EOS
 EOS
 
     @expected_bitmarks =
-      [ bmark('description', 'my cool bit & more', 'http://limebits.com/users/tim',
+      [ bmark('description', 'my cool bit &amp; more', 'http://limebits.com/users/tim',
               '/bitmarks/abcde/3'),
         bmark('name', 'mybit', 'http://limebits.com/users/tim',
               '/bitmarks/abcde/3'),
@@ -221,7 +221,7 @@ class BitmarkResponseTest < LimestoneTestCase
 
   def test_create__no_bitmarks
     response = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:multistatus xmlns:D="DAV:" xmlns:bm="http://limebits.com/ns/bitmarks/1.0/">
   <D:response>
     <D:href>/bitmarks/abcde</D:href>

@@ -1,21 +1,19 @@
 require 'tempfile'
 
 require 'rubygems'
-require 'libxml'
+require 'nokogiri'
 
 require 'test/test_helper'
 
 class RubyDavUnitTestCase < RubyDavTestCase
   
   def xml_equal? expected, actual
-    opts = { :options =>
-      (LibXML::XML::Parser::Options::NOENT |
-       LibXML::XML::Parser::Options::NOBLANKS)# |
-      # Debian Lenny is having trouble finding the COMPACT constant
-#       LibXML::XML::Parser::Options::COMPACT)
-    }
-    normalized_expected = LibXML::XML::Document.string(expected, opts).to_s
-    normalized_actual = LibXML::XML::Document.string(actual, opts).to_s
+    args = [nil, nil,
+            Nokogiri::XML::ParseOptions::NOENT |
+            Nokogiri::XML::ParseOptions::NOBLANKS ]
+    
+    normalized_expected = Nokogiri::XML::Document.parse(expected, *args).to_s
+    normalized_actual = Nokogiri::XML::Document.parse(actual, *args).to_s
     return normalized_expected == normalized_actual
   end
   
@@ -146,7 +144,7 @@ EOS
 EOS
 
     @supported_privilege_set_elem =
-      LibXML::XML::Document.string(supported_privilege_set_str).root
+      RubyDav.parse_xml supported_privilege_set_str
 
     @all_priv = RubyDav::PropKey.get 'DAV:', 'all'
     @read_priv = RubyDav::PropKey.get 'DAV:', 'read'
@@ -166,7 +164,7 @@ EOS
   end
 
   def body_root_element body
-    return LibXML::XML::Document.string(body).root
+    return RubyDav.parse_xml body
   end
 
   def validate_propfind(request,depth,body, url_path = @url_path)

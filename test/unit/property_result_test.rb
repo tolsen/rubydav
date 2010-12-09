@@ -7,7 +7,7 @@ class PropertyResultTestCase < RubyDavUnitTestCase
   def setup
     super
     displayname_str = "<D:displayname xmlns:D='DAV:'>Bob</D:displayname>"
-    @displayname_element = LibXML::XML::Document.string(displayname_str).root
+    @displayname_element = body_root_element displayname_str
     @displayname_pk = RubyDav::PropKey.get 'DAV:', 'displayname'
     @result =
       RubyDav::PropertyResult.new @displayname_pk, '200', @displayname_element
