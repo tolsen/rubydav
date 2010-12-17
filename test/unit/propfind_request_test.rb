@@ -9,7 +9,7 @@ class PropfindRequestTest < RubyDavUnitTestCase
   
   def test_propfind_allprop_request
     body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:allprop/>
 </D:propfind>
@@ -24,7 +24,7 @@ EOS
   
   def test_propfind_allprop_include_request
     body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:allprop/>
   <D:include>
@@ -44,7 +44,7 @@ EOS
   
   def test_propfind_propname_request
     body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:propname/>
 </D:propfind>
@@ -59,7 +59,7 @@ EOS
   
   def test_propfind_prop_request
     body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:prop>
     <D:displayname/>
@@ -84,7 +84,7 @@ EOS
 
   def test_propfind_unauthorized_propstat
     expected_body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:prop>
     <D:displayname/>
@@ -93,7 +93,7 @@ EOS
 EOS
 
     response = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:multistatus xmlns:D="DAV:">
   <D:response>
     <D:href>/</D:href>
@@ -131,7 +131,7 @@ EOS
     testcases.each do |depth|
       define_method "test_propfind_request_depth_#{depth.to_s}" do
         body = <<EOS
-<?xml version="1.0" encoding="utf-8" ?>
+<?xml version="1.0" encoding="UTF-8"?>
 <D:propfind xmlns:D="DAV:">
   <D:allprop/>
 </D:propfind>

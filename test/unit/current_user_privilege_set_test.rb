@@ -12,7 +12,7 @@ class CurrentUserPrivilegeSetTest < RubyDavUnitTestCase
   <privilege><write/></privilege> 
 </current-user-privilege-set>
 EOS
-    @cups_elem = LibXML::XML::Document.string(cups_str).root
+    @cups_elem = body_root_element cups_str
 
     @privileges = [RubyDav::PropKey.get('DAV:', 'read'),
                    RubyDav::PropKey.get('DAV:', 'write')]

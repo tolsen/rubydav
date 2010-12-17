@@ -64,7 +64,7 @@ module RubyDav
         abstract = children.include? 'abstract'
 
         description = children['description'].content
-        language = children['description'].lang
+        language = RubyDav.xml_lang children['description']
         children = map_from_elem_to_children elem
 
         return new(privilege, description, language, abstract, *children)

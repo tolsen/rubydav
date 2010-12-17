@@ -5,10 +5,13 @@ require 'lib/rubydav/active_lock'
 class ActiveLockTest < RubyDavUnitTestCase
   
   def element_with_text name, text
-    node = LibXML::XML::Node.new name, text
-    ns = LibXML::XML::Namespace.new node, 'D', 'DAV:'
-    node.namespaces.namespace = ns
-    doc = LibXML::XML::Document.new
+
+    doc = Nokogiri::XML::Document.new
+    node = Nokogiri::XML::Node.new name, doc
+    node.add_namespace_definition 'D', 'DAV:'
+    node.namespace = node.namespace_definitions.find { |ns| ns.prefix == 'D' }
+    txt = Nokogiri::XML::Text.new text, doc
+    node << txt
     doc.root = node
     return node
   end

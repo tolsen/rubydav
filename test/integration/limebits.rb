@@ -11,14 +11,16 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     lb_email_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'email')
     prin_uri = get_principal_uri(@creds[:username])
     
-    response = @request.proppatch(prin_uri, { lb_email_propkey => 'foo@bar.com' })
-    assert_equal '207', response.status
-    assert !response.error?
-    assert_equal '200', response[lb_email_propkey].status
-
     response = @request.propfind(prin_uri, 0, lb_email_propkey)
     assert_equal '207', response.status
-    assert_equal 'foo@bar.com', response[lb_email_propkey].inner_value.strip
+    current_email = response[lb_email_propkey].inner_value.strip
+    
+    response = @request.proppatch(prin_uri, { lb_email_propkey => 'foo@bar.com' })
+    
+    # ensure proppatch cannot be used to update email property
+    response = @request.propfind(prin_uri, 0, lb_email_propkey)
+    assert_equal '207', response.status
+    assert_equal current_email, response[lb_email_propkey].inner_value.strip
     
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
@@ -29,11 +31,10 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     lb_email_propkey = RubyDav::PropKey.get('http://limebits.com/ns/1.0/', 'email')
     prin_uri = get_principal_uri(@creds[:username])
     
-    response = @request.proppatch(prin_uri, { lb_email_propkey => 'foo2@bar.com' })
+    response = @request.propfind(prin_uri, 0, lb_email_propkey)
     assert_equal '207', response.status
-    assert !response.error?
-    assert_equal '200', response[lb_email_propkey].status
-
+    current_email = response[lb_email_propkey].inner_value.strip
+    
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
     assert_equal '403', response[lb_email_propkey].status
@@ -46,7 +47,7 @@ class WebDavLimeBitsTest < Test::Unit::TestCase
     response = @request.propfind(prin_uri, 0, lb_email_propkey, testcreds)
     assert_equal '207', response.status
     assert_equal '200', response[lb_email_propkey].status
-    assert_equal 'foo2@bar.com', response[lb_email_propkey].inner_value.strip
+    assert_equal current_email, response[lb_email_propkey].inner_value.strip
 
     acl.shift
     response = @request.acl prin_uri, acl

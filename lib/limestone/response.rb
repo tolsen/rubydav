@@ -17,6 +17,11 @@ module RubyDav
         owner = RubyDav.first_element_named(hsh[:owner].element, 'href').content
         hsh.each do |pk, pr|
           next unless pk.ns == Bitmark::BITMARK_NS && pr.status == '200'
+
+          # FIXME: not supported in Nokogiri.
+          # Need another way to avoid double escaping
+          #          pr.element.output_escaping = false
+          
           @bitmarks << Bitmark.new(pk.name, pr.inner_value, owner, u)
         end
       end

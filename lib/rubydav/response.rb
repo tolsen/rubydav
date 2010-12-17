@@ -12,7 +12,6 @@ module RubyDav
   class Response
 
     include Utility
-    include LibXML
 
     attr_reader :url
 
@@ -74,7 +73,6 @@ module RubyDav
 
     class << self
       include Utility
-      include LibXML
     end
     
   end
@@ -116,9 +114,9 @@ module RubyDav
         derror = nil
         if !body.nil? && xml_content_type?(headers)
           begin
-            root = XML::Document.string(body).root
+            root = parse_xml body
             derror = DavError.parse root
-          rescue XML::Error  # possibly not a proper xml body
+          rescue Nokogiri::XML::SyntaxError  # possibly not a proper xml body
           end
         end
         return derror
@@ -149,7 +147,7 @@ module RubyDav
     class << self
       def create(url,status,headers,body,method)
         responses = {}
-        root = XML::Document.string(body).root
+        root = parse_xml body
 
         raise BadResponseError unless node_has_name? root, 'multistatus'
         description = nil
@@ -238,7 +236,7 @@ module RubyDav
       end
 
       def parse_body(body)
-        root = XML::Document.string(body).root
+        root = parse_xml body
         
         raise BadResponseError unless node_has_name? root, 'prop'
         ld_elem = first_element_named root, 'lockdiscovery'
@@ -506,7 +504,7 @@ module RubyDav
           status = parse_status ps_children['status'].content
 
           dav_error = DavError.parse ps_children['error']
-          ps_children['prop'].each_element do |property|
+          ps_children['prop'].element_children.each do |property|
             pk = PropKey.get(namespace_href(property), property.name)
             result = PropertyResult.new pk, status, property, dav_error
             properties[pk] = result
@@ -518,7 +516,7 @@ module RubyDav
 
       # returns hash of hashes: url -> PropKey -> PropertyResult
       def parse_body body, url
-        root = XML::Document.string(body).root
+        root = parse_xml body
         assert_elem_name root, 'multistatus'
 
         return elements_named(root, 'response').inject({}) do |h, r|
@@ -544,7 +542,7 @@ module RubyDav
       private
 
       def parse_body body, url
-        root = XML::Document.string(body).root
+        root = parse_xml body
         assert_elem_name root, 'mkcol-response'
         return { url => parse_propstats(root) }
       rescue ArgumentError
@@ -586,7 +584,7 @@ module RubyDav
       ['413', nil] => RequestEntityTooLargeError,
       ['414', nil] => RequestUriTooLargeError,
       ['415', nil] => UnsupportedMediaTypeError,
-      ['422', nil] => ErrorResponse,
+      ['422', nil] => UnprocessableEntityError,
       ['423', nil] => LockedError,
       ['424', :mkcol_ext] => MkcolResponse,
       ['424', nil] => ErrorResponse,
